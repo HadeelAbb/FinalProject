@@ -2,21 +2,41 @@ package com.hsts.client.network;
 
 import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
+import com.hsts.shared.model.Exam;
+import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.model.ExamStatus;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.QuestionAnswer;
+import com.hsts.shared.model.Student;
+import com.hsts.shared.model.SubjectCoordinator;
 import com.hsts.shared.model.Teacher;
+import com.hsts.shared.model.User;
 import com.hsts.shared.net.Command;
 import com.hsts.shared.net.Response;
+import com.hsts.shared.net.dto.ConfirmGradeData;
+import com.hsts.shared.net.dto.CreateExamAutoData;
+import com.hsts.shared.net.dto.CreateExamManualData;
 import com.hsts.shared.net.dto.CreateQuestionData;
 import com.hsts.shared.net.dto.DeleteQuestionData;
 import com.hsts.shared.net.dto.EditQuestionData;
+import com.hsts.shared.net.dto.ExamApprovalDecisionData;
+import com.hsts.shared.net.dto.ExtendExamTimeData;
+import com.hsts.shared.net.dto.GetAvailableExamsData;
+import com.hsts.shared.net.dto.GetExamAnswerCopyData;
+import com.hsts.shared.net.dto.GetMyResultsData;
+import com.hsts.shared.net.dto.GetPendingGradingData;
 import com.hsts.shared.net.dto.LoginData;
 import com.hsts.shared.net.dto.SearchQuestionsData;
+import com.hsts.shared.net.dto.StartExamData;
+import com.hsts.shared.net.dto.SubmitExamData;
+import com.hsts.shared.net.dto.SubmitExamForApprovalData;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * =====================================================================
@@ -35,24 +55,47 @@ public class MockServerSimulator {
 
     private final Map<String, String> credentials = new HashMap<>();
     private final Map<String, Teacher> teachersByUsername = new HashMap<>();
+    private final Map<String, Student> studentsByUsername = new HashMap<>();
+    private final Map<String, SubjectCoordinator> coordinatorsByUsername = new HashMap<>();
+    private final Map<String, User> usersById = new HashMap<>();
     private final List<Question> questionBank = new ArrayList<>();
+    private final List<Exam> exams = new ArrayList<>();
+    private final List<ExamAnswer> examAnswers = new ArrayList<>();
+    private int examSeq = 0;
+    private int examAnswerSeq = 0;
 
     private final Course course11 = new Course("11", "Introduction to Computer Science");
     private final Course course22 = new Course("22", "Discrete Mathematics");
 
     public MockServerSimulator() {
         seedTeachers();
+        seedStudentsAndCoordinators();
         seedQuestions();
+    }
+
+    private void seedStudentsAndCoordinators() {
+        credentials.put("student1", "pass123");
+        Student student1 = new Student("S1", "Noa", "Ben-David", "student1@school.edu", List.of(course11, course22));
+        studentsByUsername.put("student1", student1);
+        usersById.put(student1.getId(), student1);
+
+        credentials.put("coordinator1", "pass123");
+        SubjectCoordinator coord1 = new SubjectCoordinator("C1", "Rami", "Azoulay", "coordinator1@school.edu",
+                List.of(course11, course22), "CS");
+        coordinatorsByUsername.put("coordinator1", coord1);
+        usersById.put(coord1.getId(), coord1);
     }
 
     private void seedTeachers() {
         credentials.put("teacher1", "pass123");
-        teachersByUsername.put("teacher1",
-                new Teacher("T1", "Dana", "Levi", "teacher1@school.edu", List.of(course11, course22)));
+        Teacher t1 = new Teacher("T1", "Dana", "Levi", "teacher1@school.edu", List.of(course11, course22));
+        teachersByUsername.put("teacher1", t1);
+        usersById.put(t1.getId(), t1);
 
         credentials.put("teacher2", "pass123");
-        teachersByUsername.put("teacher2",
-                new Teacher("T2", "Omer", "Cohen", "teacher2@school.edu", List.of(course11)));
+        Teacher t2 = new Teacher("T2", "Omer", "Cohen", "teacher2@school.edu", List.of(course11));
+        teachersByUsername.put("teacher2", t2);
+        usersById.put(t2.getId(), t2);
     }
 
     private void seedQuestions() {
@@ -118,6 +161,26 @@ public class MockServerSimulator {
             case CREATE_QUESTION -> handleCreate((CreateQuestionData) payload);
             case EDIT_QUESTION -> handleEdit((EditQuestionData) payload);
             case DELETE_QUESTION -> handleDelete((DeleteQuestionData) payload);
+
+            case CREATE_EXAM_MANUAL -> handleCreateExamManual((CreateExamManualData) payload);
+            case CREATE_EXAM_AUTO -> handleCreateExamAuto((CreateExamAutoData) payload);
+            case SUBMIT_EXAM_FOR_APPROVAL -> handleSubmitForApproval((SubmitExamForApprovalData) payload);
+            case GET_PENDING_APPROVAL_EXAMS -> handleGetPendingApproval();
+            case APPROVE_EXAM -> handleApprove((ExamApprovalDecisionData) payload);
+            case REJECT_EXAM -> handleReject((ExamApprovalDecisionData) payload);
+
+            case GET_AVAILABLE_EXAMS -> handleGetAvailableExams((GetAvailableExamsData) payload);
+            case START_EXAM -> handleStartExam((StartExamData) payload);
+            case SUBMIT_EXAM -> handleSubmitExam((SubmitExamData) payload);
+
+            case GET_PENDING_GRADING -> handleGetPendingGrading((GetPendingGradingData) payload);
+            case CONFIRM_GRADE -> handleConfirmGrade((ConfirmGradeData) payload);
+
+            case GET_MY_RESULTS -> handleGetMyResults((GetMyResultsData) payload);
+            case GET_EXAM_ANSWER_COPY -> handleGetExamAnswerCopy((GetExamAnswerCopyData) payload);
+
+            case EXTEND_EXAM_TIME -> handleExtendTime((ExtendExamTimeData) payload);
+
             default -> Response.failure(command, "Unsupported command", null);
         };
     }
@@ -127,8 +190,14 @@ public class MockServerSimulator {
         if (storedPassword == null || !storedPassword.equals(data.getPassword())) {
             return Response.failure(Command.LOGIN, "Invalid username or password.", null);
         }
-        Teacher teacher = teachersByUsername.get(data.getUsername());
-        return Response.success(Command.LOGIN, teacher, null, null);
+        User user = coordinatorsByUsername.get(data.getUsername());
+        if (user == null) {
+            user = teachersByUsername.get(data.getUsername());
+        }
+        if (user == null) {
+            user = studentsByUsername.get(data.getUsername());
+        }
+        return Response.success(Command.LOGIN, user, null, null);
     }
 
     private Response handleSearch(SearchQuestionsData criteria) {
@@ -212,6 +281,258 @@ public class MockServerSimulator {
 
     private Question findById(String questionId) {
         return questionBank.stream().filter(q -> q.getQuestionId().equals(questionId)).findFirst().orElse(null);
+    }
+
+    // ===================== SUC-2 / SUC-3: exam building =====================
+
+    private Response handleCreateExamManual(CreateExamManualData data) {
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null || !teacher.teaches(data.getCourseId())) {
+            return Response.failure(Command.CREATE_EXAM_MANUAL,
+                    "You don't have permission to build exams for this course.", null);
+        }
+        if (data.getQuestionIds() == null || data.getQuestionIds().isEmpty()) {
+            return Response.failure(Command.CREATE_EXAM_MANUAL, "An exam must contain at least one question.", null);
+        }
+        List<Question> chosen = data.getQuestionIds().stream()
+                .map(this::findById)
+                .filter(q -> q != null)
+                .collect(Collectors.toList());
+        if (chosen.size() != data.getQuestionIds().size()) {
+            return Response.failure(Command.CREATE_EXAM_MANUAL, "One or more selected questions no longer exist.", null);
+        }
+        Exam exam = new Exam(nextExamId(), data.getCourseId(), data.getTitle(), data.getInstructionsForStudents(),
+                chosen, data.getDurationMinutes(), data.getTeacherId());
+        exams.add(exam);
+        return Response.success(Command.CREATE_EXAM_MANUAL, exam, "Exam created as draft.", null);
+    }
+
+    private Response handleCreateExamAuto(CreateExamAutoData data) {
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null || !teacher.teaches(data.getCourseId())) {
+            return Response.failure(Command.CREATE_EXAM_AUTO,
+                    "You don't have permission to build exams for this course.", null);
+        }
+        List<Question> matches = questionBank.stream()
+                .filter(q -> q.getCourseId().equals(data.getCourseId()))
+                .filter(q -> data.getTopic() == null || data.getTopic().isBlank()
+                        || q.getTopic().toLowerCase().contains(data.getTopic().toLowerCase()))
+                .filter(q -> data.getDifficulty() == null || q.getDifficulty() == data.getDifficulty())
+                .limit(Math.max(data.getNumberOfQuestions(), 0))
+                .collect(Collectors.toList());
+        if (matches.size() < data.getNumberOfQuestions()) {
+            return Response.failure(Command.CREATE_EXAM_AUTO,
+                    "Not enough matching questions in the bank (found " + matches.size()
+                            + ", requested " + data.getNumberOfQuestions() + ").", null);
+        }
+        Exam exam = new Exam(nextExamId(), data.getCourseId(), data.getTitle(), data.getInstructionsForStudents(),
+                matches, data.getDurationMinutes(), data.getTeacherId());
+        exams.add(exam);
+        return Response.success(Command.CREATE_EXAM_AUTO, exam, "Exam auto-built as draft.", null);
+    }
+
+    // ===================== SUC-4: approval =====================
+
+    private Response handleSubmitForApproval(SubmitExamForApprovalData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL, "Exam not found.", null);
+        }
+        if (exam.getStatus() != ExamStatus.DRAFT && exam.getStatus() != ExamStatus.REJECTED) {
+            return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
+                    "Only a draft or rejected exam can be submitted for approval.", null);
+        }
+        exam.setStatus(ExamStatus.PENDING_APPROVAL);
+        exam.setRejectionReason(null);
+        return Response.success(Command.SUBMIT_EXAM_FOR_APPROVAL, exam, "Exam submitted for approval.", null);
+    }
+
+    private Response handleGetPendingApproval() {
+        List<Exam> pending = exams.stream()
+                .filter(e -> e.getStatus() == ExamStatus.PENDING_APPROVAL)
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_PENDING_APPROVAL_EXAMS, pending, null, null);
+    }
+
+    private Response handleApprove(ExamApprovalDecisionData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.APPROVE_EXAM, "Exam not found.", null);
+        }
+        exam.setStatus(ExamStatus.APPROVED);
+        exam.setApprovedByCoordinatorId(data.getCoordinatorId());
+        exam.setScheduledStart(LocalDateTime.now());
+        exam.setScheduledEnd(LocalDateTime.now().plusDays(7));
+        return Response.success(Command.APPROVE_EXAM, exam, "Exam approved.", null);
+    }
+
+    private Response handleReject(ExamApprovalDecisionData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.REJECT_EXAM, "Exam not found.", null);
+        }
+        if (data.getReason() == null || data.getReason().isBlank()) {
+            return Response.failure(Command.REJECT_EXAM, "A rejection reason is required.", null);
+        }
+        exam.setStatus(ExamStatus.REJECTED);
+        exam.setRejectionReason(data.getReason());
+        return Response.success(Command.REJECT_EXAM, exam, "Exam rejected.", null);
+    }
+
+    // ===================== SUC-6: taking an exam =====================
+
+    private Response handleGetAvailableExams(GetAvailableExamsData data) {
+        Student student = (Student) usersById.get(data.getStudentId());
+        if (student == null) {
+            return Response.failure(Command.GET_AVAILABLE_EXAMS, "Student not found.", null);
+        }
+        List<Exam> available = exams.stream()
+                .filter(e -> e.getStatus() == ExamStatus.APPROVED)
+                .filter(e -> student.enrolledIn(e.getCourseId()))
+                .filter(e -> examAnswers.stream().noneMatch(
+                        a -> a.getExamId().equals(e.getExamId()) && a.getStudentId().equals(student.getId())))
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_AVAILABLE_EXAMS, available, null, null);
+    }
+
+    private Response handleStartExam(StartExamData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null || exam.getStatus() != ExamStatus.APPROVED) {
+            return Response.failure(Command.START_EXAM, "This exam is not available to take.", null);
+        }
+        boolean alreadyTaken = examAnswers.stream()
+                .anyMatch(a -> a.getExamId().equals(data.getExamId()) && a.getStudentId().equals(data.getStudentId()));
+        if (alreadyTaken) {
+            return Response.failure(Command.START_EXAM, "You have already taken this exam.", null);
+        }
+        ExamAnswer answer = new ExamAnswer(nextExamAnswerId(), data.getExamId(), data.getStudentId());
+        answer.setStartedAt(LocalDateTime.now());
+        examAnswers.add(answer);
+        // Client displays exam.getQuestions() without revealing which answer is correct.
+        return Response.success(Command.START_EXAM, exam, "Exam started. Answer id: " + answer.getExamAnswerId(), null);
+    }
+
+    private Response handleSubmitExam(SubmitExamData data) {
+        ExamAnswer answer = examAnswers.stream()
+                .filter(a -> a.getExamId().equals(data.getExamId()) && a.getStudentId().equals(data.getStudentId()))
+                .findFirst().orElse(null);
+        if (answer == null) {
+            return Response.failure(Command.SUBMIT_EXAM, "No in-progress attempt found for this exam.", null);
+        }
+        if (answer.getSubmittedAt() != null) {
+            return Response.failure(Command.SUBMIT_EXAM, "This exam was already submitted.", null);
+        }
+        Exam exam = findExamById(data.getExamId());
+        answer.setSelectedAnswers(data.getSelectedAnswers());
+        answer.setSubmittedAt(LocalDateTime.now());
+        answer.setAutoSubmitted(data.isAutoSubmitted());
+
+        // ===== SUC-7: automatic grading, right at submission time =====
+        double score = gradeExam(exam, answer);
+        answer.setAutoScore(score);
+
+        return Response.success(Command.SUBMIT_EXAM, answer, "Exam submitted and auto-graded.", null);
+    }
+
+    private double gradeExam(Exam exam, ExamAnswer answer) {
+        if (exam == null || exam.getQuestions().isEmpty()) {
+            return 0.0;
+        }
+        double points = exam.pointsPerQuestion();
+        double total = 0.0;
+        for (Question q : exam.getQuestions()) {
+            String selected = answer.getSelectedAnswers().get(q.getQuestionId());
+            QuestionAnswer correct = q.getCorrectAnswer();
+            if (selected != null && correct != null && selected.equals(correct.getText())) {
+                total += points;
+            }
+        }
+        return Math.round(total * 100.0) / 100.0;
+    }
+
+    // ===================== SUC-7 / SUC-8: grading & confirmation =====================
+
+    private Response handleGetPendingGrading(GetPendingGradingData data) {
+        List<ExamAnswer> pending = examAnswers.stream()
+                .filter(a -> a.getSubmittedAt() != null && !a.isGradeConfirmed())
+                .filter(a -> {
+                    Exam e = findExamById(a.getExamId());
+                    return e != null && data.getTeacherId().equals(e.getCreatedByTeacherId());
+                })
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_PENDING_GRADING, pending, null, null);
+    }
+
+    private Response handleConfirmGrade(ConfirmGradeData data) {
+        ExamAnswer answer = examAnswers.stream()
+                .filter(a -> a.getExamAnswerId().equals(data.getExamAnswerId()))
+                .findFirst().orElse(null);
+        if (answer == null) {
+            return Response.failure(Command.CONFIRM_GRADE, "Exam answer not found.", null);
+        }
+        boolean overridden = data.getFinalScore() != null
+                && !data.getFinalScore().equals(answer.getAutoScore());
+        if (overridden && (data.getTeacherComment() == null || data.getTeacherComment().isBlank())) {
+            return Response.failure(Command.CONFIRM_GRADE,
+                    "Changing the automatic score requires a comment explaining why.", null);
+        }
+        answer.setFinalScore(data.getFinalScore() != null ? data.getFinalScore() : answer.getAutoScore());
+        answer.setTeacherComment(data.getTeacherComment());
+        answer.setGradeConfirmed(true);
+        return Response.success(Command.CONFIRM_GRADE, answer, "Grade confirmed.", null);
+    }
+
+    // ===================== SUC-10: viewing results =====================
+
+    private Response handleGetMyResults(GetMyResultsData data) {
+        List<ExamAnswer> mine = examAnswers.stream()
+                .filter(a -> a.getStudentId().equals(data.getStudentId()) && a.isGradeConfirmed())
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_MY_RESULTS, mine, null, null);
+    }
+
+    private Response handleGetExamAnswerCopy(GetExamAnswerCopyData data) {
+        ExamAnswer answer = examAnswers.stream()
+                .filter(a -> a.getExamAnswerId().equals(data.getExamAnswerId())
+                        && a.getStudentId().equals(data.getStudentId()))
+                .findFirst().orElse(null);
+        if (answer == null || !answer.isGradeConfirmed()) {
+            return Response.failure(Command.GET_EXAM_ANSWER_COPY, "Graded exam not found.", null);
+        }
+        Exam exam = findExamById(answer.getExamId());
+        // Payload is a 2-element array: [Exam (with correct answers), ExamAnswer (student's own answers)].
+        return Response.success(Command.GET_EXAM_ANSWER_COPY, new Object[]{exam, answer}, null, null);
+    }
+
+    // ===================== SUC-17: extend time mid-exam =====================
+
+    private Response handleExtendTime(ExtendExamTimeData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.EXTEND_EXAM_TIME, "Exam not found.", null);
+        }
+        if (!data.getTeacherId().equals(exam.getCreatedByTeacherId())) {
+            return Response.failure(Command.EXTEND_EXAM_TIME, "Only the exam's creator can extend its time.", null);
+        }
+        exam.setDurationMinutes(exam.getDurationMinutes() + data.getAdditionalMinutes());
+        return Response.success(Command.EXTEND_EXAM_TIME, exam,
+                "Time extended by " + data.getAdditionalMinutes() + " minutes.", null);
+    }
+
+    // ===================== shared helpers =====================
+
+    private Exam findExamById(String examId) {
+        return exams.stream().filter(e -> e.getExamId().equals(examId)).findFirst().orElse(null);
+    }
+
+    private String nextExamId() {
+        examSeq++;
+        return "E" + examSeq;
+    }
+
+    private String nextExamAnswerId() {
+        examAnswerSeq++;
+        return "EA" + examAnswerSeq;
     }
 
     /**
