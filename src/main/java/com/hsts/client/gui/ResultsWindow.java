@@ -1,6 +1,8 @@
 package com.hsts.client.gui;
 
+import com.hsts.client.controller.LoginClientController;
 import com.hsts.client.controller.ResultsClientController;
+import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
 import com.hsts.shared.model.Question;
@@ -8,30 +10,56 @@ import com.hsts.shared.model.QuestionAnswer;
 import com.hsts.shared.model.Student;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 
 import java.util.List;
 
 public class ResultsWindow {
 
+    @FXML private Button backButton;
+    @FXML private Button logoutButton;
     @FXML private ListView<ExamAnswer> resultsListView;
     @FXML private Label scoreLabel;
     @FXML private Label commentLabel;
-    @FXML private ListView<String> copyView;
+    @FXML private Button viewCopyButton;
+    @FXML private ListView<AnswerRow> copyView;
     @FXML private Label errorLabel;
 
     private ResultsClientController controller;
+    private Student navUser;
+    private ServerConnection navClient;
+    private LoginClientController navLoginController;
 
-    public void init(ResultsClientController controller, Student student) {
+    public void init(ResultsClientController controller, Student student,
+                      ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
+        this.navUser = student;
+        this.navClient = client;
+        this.navLoginController = loginController;
         controller.setCurrentStudent(student);
         controller.setView(this);
+
+        resultsListView.setPlaceholder(new Label("No confirmed results yet."));
+        copyView.setPlaceholder(new Label("Select a result, then click \"View graded copy\"."));
+        copyView.setCellFactory(list -> new AnswerRowCell());
 
         resultsListView.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldVal, newVal) -> showSummary(newVal));
 
         controller.refreshResults();
+    }
+
+    @FXML
+    void handleBack(ActionEvent event) {
+        NavigationHelper.goToDashboard(backButton, navUser, navClient, navLoginController);
+    }
+
+    @FXML
+    void handleLogout(ActionEvent event) {
+        NavigationHelper.logoutWithConfirmation(logoutButton, navClient, navLoginController);
     }
 
     private void showSummary(ExamAnswer answer) {
@@ -67,18 +95,36 @@ public class ResultsWindow {
     }
 
     public void displayCopy(Exam exam, ExamAnswer answer) {
-        List<String> lines = exam.getQuestions().stream().map(q -> {
+        List<AnswerRow> rows = exam.getQuestions().stream().map(q -> {
             String mine = answer.getSelectedAnswers().get(q.getQuestionId());
             QuestionAnswer correct = q.getCorrectAnswer();
-            String correctText = correct != null ? correct.getText() : "?";
-            String mark = mine != null && correct != null && mine.equals(correct.getText()) ? "correct" : "incorrect";
-            return q.getText() + "\n  your answer: " + mine + " (" + mark + ")"
-                    + (mark.equals("incorrect") ? " - correct answer: " + correctText : "");
+            boolean isCorrect = mine != null && correct != null && mine.equals(correct.getText());
+            return new AnswerRow(q, mine, correct != null ? correct.getText() : "?", isCorrect);
         }).toList();
-        copyView.getItems().setAll(lines);
+        copyView.getItems().setAll(rows);
     }
 
     public void showError(String message) {
         errorLabel.setText(message);
+    }
+
+    private record AnswerRow(Question question, String myAnswer, String correctAnswer, boolean correct) {
+    }
+
+    private static class AnswerRowCell extends ListCell<AnswerRow> {
+        @Override
+        protected void updateItem(AnswerRow row, boolean empty) {
+            super.updateItem(row, empty);
+            if (empty || row == null) {
+                setText(null);
+                setStyle("");
+                return;
+            }
+            String myText = row.myAnswer() != null ? row.myAnswer() : "(no answer)";
+            String line = row.question().getText() + "\n  your answer: " + myText
+                    + (row.correct() ? "  \u2713 correct" : "  \u2717 incorrect - correct answer: " + row.correctAnswer());
+            setText(line);
+            setStyle(row.correct() ? "-fx-text-fill: #1a7a1a;" : "-fx-text-fill: #b3261e;");
+        }
     }
 }
