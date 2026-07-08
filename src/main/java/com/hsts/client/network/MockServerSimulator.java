@@ -1,5 +1,7 @@
 package com.hsts.client.network;
 
+import com.hsts.shared.model.BotInteraction;
+import com.hsts.shared.model.BotUsageStats;
 import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
@@ -13,6 +15,7 @@ import com.hsts.shared.model.Teacher;
 import com.hsts.shared.model.User;
 import com.hsts.shared.net.Command;
 import com.hsts.shared.net.Response;
+import com.hsts.shared.net.dto.AskBotQuestionData;
 import com.hsts.shared.net.dto.ConfirmGradeData;
 import com.hsts.shared.net.dto.CreateExamAutoData;
 import com.hsts.shared.net.dto.CreateExamManualData;
@@ -22,7 +25,10 @@ import com.hsts.shared.net.dto.EditQuestionData;
 import com.hsts.shared.net.dto.ExamApprovalDecisionData;
 import com.hsts.shared.net.dto.ExtendExamTimeData;
 import com.hsts.shared.net.dto.GetAvailableExamsData;
+import com.hsts.shared.net.dto.GetBotHistoryData;
+import com.hsts.shared.net.dto.GetBotUsageStatsData;
 import com.hsts.shared.net.dto.GetExamAnswerCopyData;
+import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.GetMyResultsData;
 import com.hsts.shared.net.dto.GetPendingGradingData;
 import com.hsts.shared.net.dto.LoginData;
@@ -34,8 +40,10 @@ import com.hsts.shared.net.dto.SubmitExamForApprovalData;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -61,8 +69,10 @@ public class MockServerSimulator {
     private final List<Question> questionBank = new ArrayList<>();
     private final List<Exam> exams = new ArrayList<>();
     private final List<ExamAnswer> examAnswers = new ArrayList<>();
+    private final List<BotInteraction> botInteractions = new ArrayList<>();
     private int examSeq = 0;
     private int examAnswerSeq = 0;
+    private int botInteractionSeq = 0;
 
     private final Course course11 = new Course("11", "Introduction to Computer Science");
     private final Course course22 = new Course("22", "Discrete Mathematics");
@@ -164,6 +174,7 @@ public class MockServerSimulator {
 
             case CREATE_EXAM_MANUAL -> handleCreateExamManual((CreateExamManualData) payload);
             case CREATE_EXAM_AUTO -> handleCreateExamAuto((CreateExamAutoData) payload);
+            case GET_MY_EXAMS -> handleGetMyExams((GetMyExamsData) payload);
             case SUBMIT_EXAM_FOR_APPROVAL -> handleSubmitForApproval((SubmitExamForApprovalData) payload);
             case GET_PENDING_APPROVAL_EXAMS -> handleGetPendingApproval();
             case APPROVE_EXAM -> handleApprove((ExamApprovalDecisionData) payload);
@@ -180,6 +191,10 @@ public class MockServerSimulator {
             case GET_EXAM_ANSWER_COPY -> handleGetExamAnswerCopy((GetExamAnswerCopyData) payload);
 
             case EXTEND_EXAM_TIME -> handleExtendTime((ExtendExamTimeData) payload);
+
+            case ASK_BOT_QUESTION -> handleAskBot((AskBotQuestionData) payload);
+            case GET_BOT_HISTORY -> handleGetBotHistory((GetBotHistoryData) payload);
+            case GET_BOT_USAGE_STATS -> handleGetBotUsageStats((GetBotUsageStatsData) payload);
 
             default -> Response.failure(command, "Unsupported command", null);
         };
@@ -305,6 +320,13 @@ public class MockServerSimulator {
                 chosen, data.getDurationMinutes(), data.getTeacherId());
         exams.add(exam);
         return Response.success(Command.CREATE_EXAM_MANUAL, exam, "Exam created as draft.", null);
+    }
+
+    private Response handleGetMyExams(GetMyExamsData data) {
+        List<Exam> mine = exams.stream()
+                .filter(e -> e.getCreatedByTeacherId().equals(data.getTeacherId()))
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_MY_EXAMS, mine, null, null);
     }
 
     private Response handleCreateExamAuto(CreateExamAutoData data) {
@@ -519,6 +541,66 @@ public class MockServerSimulator {
                 "Time extended by " + data.getAdditionalMinutes() + " minutes.", null);
     }
 
+    // ===================== SUC-13/14/15: study bot =====================
+
+    private Response handleAskBot(AskBotQuestionData data) {
+        Student student = (Student) usersById.get(data.getStudentId());
+        if (student == null || !student.enrolledIn(data.getCourseId())) {
+            return Response.failure(Command.ASK_BOT_QUESTION,
+                    "You must be enrolled in this course to use the bot.", null);
+        }
+        boolean examInProgress = examAnswers.stream()
+                .filter(a -> a.getStudentId().equals(student.getId()) && a.getSubmittedAt() == null)
+                .anyMatch(a -> {
+                    Exam e = findExamById(a.getExamId());
+                    return e != null && e.getCourseId().equals(data.getCourseId());
+                });
+        if (examInProgress) {
+            return Response.failure(Command.ASK_BOT_QUESTION,
+                    "The bot is unavailable while you have an exam in progress for this course.", null);
+        }
+        if (data.getQuestion() == null || data.getQuestion().isBlank()) {
+            return Response.failure(Command.ASK_BOT_QUESTION, "Type a question first.", null);
+        }
+
+        // PARTNER 2/1 TODO: this is a canned placeholder, not a real AI call.
+        // Swap this for an actual call to the external bot API (per spec
+        // 3.1) - if the API returns nothing, show the same "no answer"
+        // message this stub returns for blank questions above.
+        String answer = "(simulated bot answer) I don't have a real AI connection yet, but here's an "
+                + "acknowledgement of your question about \"" + data.getQuestion() + "\" - ask your teacher "
+                + "for now, or check back once the real bot API is wired in.";
+
+        BotInteraction interaction = new BotInteraction(nextBotInteractionId(), student.getId(),
+                data.getCourseId(), data.getQuestion(), answer);
+        botInteractions.add(interaction);
+        return Response.success(Command.ASK_BOT_QUESTION, interaction, null, null);
+    }
+
+    private Response handleGetBotHistory(GetBotHistoryData data) {
+        List<BotInteraction> mine = botInteractions.stream()
+                .filter(i -> i.getStudentId().equals(data.getStudentId()))
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_BOT_HISTORY, mine, null, null);
+    }
+
+    private Response handleGetBotUsageStats(GetBotUsageStatsData data) {
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null) {
+            return Response.failure(Command.GET_BOT_USAGE_STATS, "Teacher not found.", null);
+        }
+        List<BotUsageStats> stats = new ArrayList<>();
+        for (Course course : teacher.getCourses()) {
+            List<BotInteraction> forCourse = botInteractions.stream()
+                    .filter(i -> i.getCourseId().equals(course.getId()))
+                    .collect(Collectors.toList());
+            Set<String> uniqueStudents = forCourse.stream().map(BotInteraction::getStudentId)
+                    .collect(Collectors.toCollection(HashSet::new));
+            stats.add(new BotUsageStats(course.getId(), forCourse.size(), uniqueStudents.size()));
+        }
+        return Response.success(Command.GET_BOT_USAGE_STATS, stats, null, null);
+    }
+
     // ===================== shared helpers =====================
 
     private Exam findExamById(String examId) {
@@ -533,6 +615,11 @@ public class MockServerSimulator {
     private String nextExamAnswerId() {
         examAnswerSeq++;
         return "EA" + examAnswerSeq;
+    }
+
+    private String nextBotInteractionId() {
+        botInteractionSeq++;
+        return "BOT" + botInteractionSeq;
     }
 
     /**
