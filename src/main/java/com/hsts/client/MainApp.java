@@ -20,7 +20,7 @@ public class MainApp extends Application {
     // Flip to true to run the GUI standalone against MockServerConnection,
     // with no live HSTSServer needed - useful if the real server crashes
     // or isn't running yet during a demo.
-    private static final boolean USE_MOCK_SERVER = false;
+    private static final boolean USE_MOCK_SERVER = true;
 
     // TEMP: confirm with whoever runs the real HSTSServer that this matches.
     private static final String SERVER_HOST = "localhost";
