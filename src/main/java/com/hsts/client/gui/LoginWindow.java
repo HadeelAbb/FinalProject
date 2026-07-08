@@ -108,7 +108,7 @@ public class LoginWindow {
         String username = usernameField.getText();
         MainApp.getLoginManager().checkAndLogin(
                 username,
-                () -> openQuestionManagement(user),
+                () -> openDashboard(user),
                 () -> {
                     int remaining = MainApp.getLoginManager().getRemainingTime(username);
                     errorLabel.setText("You are blocked. Please wait " + remaining + " seconds.");
@@ -116,22 +116,16 @@ public class LoginWindow {
         );
     }
 
-    private void openQuestionManagement(User user) {
+    private void openDashboard(User user) {
         try {
             FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource("/com/hsts/client/gui/question_management.fxml"));
+                    getClass().getResource("/com/hsts/client/gui/dashboard.fxml"));
             Parent root = loader.load();
-            QuestionManagementWindow qmw = loader.getController();
-
-            QuestionClientController questionController = new QuestionClientController(controller.getClient());
-            if (user instanceof Teacher teacher) {
-                questionController.setCurrentTeacher(teacher);
-            }
-            qmw.setController(questionController);
-            qmw.setLoggedInUser(user);
+            DashboardWindow dashboard = loader.getController();
+            dashboard.init(user, controller.getClient(), controller);
 
             Stage stage = (Stage) loginButton.getScene().getWindow();
-            stage.setTitle("HSTS - Question Management");
+            stage.setTitle("HSTS - Dashboard");
             stage.setScene(new Scene(root));
 
             // FIX: previously nothing ever called controller.logout(), so the
@@ -142,7 +136,7 @@ public class LoginWindow {
             // without needing to restart MainServerApp.
             stage.setOnCloseRequest(event -> controller.logout());
         } catch (IOException e) {
-            showError("System Error: Could not load Question Management screen.");
+            showError("System Error: Could not load Dashboard screen.");
         }
     }
 }
