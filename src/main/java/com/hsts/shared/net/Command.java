@@ -11,5 +11,38 @@ public enum Command {
     // client successfully creates, edits, or deletes a question, so every
     // open GUI can refresh its list automatically instead of only the
     // client that made the change seeing the update.
-    QUESTIONS_CHANGED
+    QUESTIONS_CHANGED,
+
+    // ===== Exam building (SUC-2 manual, SUC-3 automatic) =====
+    CREATE_EXAM_MANUAL,
+    CREATE_EXAM_AUTO,
+
+    // ===== Exam approval (SUC-4) =====
+    SUBMIT_EXAM_FOR_APPROVAL,
+    GET_PENDING_APPROVAL_EXAMS,
+    APPROVE_EXAM,
+    REJECT_EXAM,
+
+    // ===== Taking an exam (SUC-6) =====
+    GET_AVAILABLE_EXAMS,
+    START_EXAM,
+    SUBMIT_EXAM,
+
+    // ===== Grading (SUC-7 automatic, SUC-8 teacher confirmation) =====
+    GET_PENDING_GRADING,
+    CONFIRM_GRADE,
+
+    // ===== Viewing results (SUC-10) =====
+    GET_MY_RESULTS,
+    GET_EXAM_ANSWER_COPY,
+
+    // ===== Changing exam time mid-execution (SUC-17) =====
+    EXTEND_EXAM_TIME,
+
+    // NEW: generic broadcast event, published by the server-side EventBus
+    // whenever exam status, grading, or timing changes in a way that
+    // affects other connected clients (e.g. a coordinator approves an
+    // exam -> the teacher's screen should update; a teacher extends time
+    // -> the student's screen should update). Payload is an ExamEvent.
+    EXAM_EVENT
 }
