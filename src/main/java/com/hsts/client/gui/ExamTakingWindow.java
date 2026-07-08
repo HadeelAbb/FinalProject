@@ -1,6 +1,8 @@
 package com.hsts.client.gui;
 
 import com.hsts.client.controller.ExamTakingClientController;
+import com.hsts.client.controller.LoginClientController;
+import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
 import com.hsts.shared.model.Question;
@@ -10,6 +12,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -25,28 +28,59 @@ import java.util.Map;
 
 public class ExamTakingWindow {
 
+    @FXML private Button backButton;
+    @FXML private Button logoutButton;
     @FXML private ListView<Exam> availableExamsView;
     @FXML private ListView<Question> questionsView;
     @FXML private Label instructionsLabel;
     @FXML private Label timerLabel;
     @FXML private Label statusLabel;
     @FXML private Label errorLabel;
-    @FXML private javafx.scene.control.Button startButton;
-    @FXML private javafx.scene.control.Button submitButton;
+    @FXML private Button startButton;
+    @FXML private Button submitButton;
 
     private ExamTakingClientController controller;
     private Exam currentExam;
+    private boolean examInProgress;
     private final Map<String, ToggleGroup> answerGroups = new HashMap<>();
     private Timeline timer;
     private int secondsRemaining;
 
-    public void init(ExamTakingClientController controller, Student student) {
+    private Student navUser;
+    private ServerConnection navClient;
+    private LoginClientController navLoginController;
+
+    public void init(ExamTakingClientController controller, Student student,
+                      ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
+        this.navUser = student;
+        this.navClient = client;
+        this.navLoginController = loginController;
         controller.setCurrentStudent(student);
         controller.setView(this);
 
+        availableExamsView.setPlaceholder(new Label("No exams available to take right now."));
         questionsView.setCellFactory(list -> new QuestionCell());
         controller.loadAvailableExams();
+    }
+
+    @FXML
+    void handleBack(ActionEvent event) {
+        if (examInProgress) {
+            if (!NavigationHelper.confirm("You have an exam in progress. Going back will NOT submit it, "
+                    + "and your answers so far will be lost when the timer runs out unsupervised. Continue?")) {
+                return;
+            }
+        }
+        if (timer != null) {
+            timer.stop();
+        }
+        NavigationHelper.goToDashboard(backButton, navUser, navClient, navLoginController);
+    }
+
+    @FXML
+    void handleLogout(ActionEvent event) {
+        NavigationHelper.logoutWithConfirmation(logoutButton, navClient, navLoginController);
     }
 
     public void displayAvailableExams(List<Exam> exams) {
@@ -61,11 +95,13 @@ public class ExamTakingWindow {
             showError("Select an exam first.");
             return;
         }
+        startButton.setDisable(true);
         controller.startExam(selected.getExamId());
     }
 
     public void onExamStarted(Exam exam) {
         this.currentExam = exam;
+        this.examInProgress = true;
         answerGroups.clear();
         instructionsLabel.setText(exam.getInstructionsForStudents() != null
                 ? exam.getInstructionsForStudents() : "");
@@ -103,6 +139,14 @@ public class ExamTakingWindow {
 
     @FXML
     void handleSubmit(ActionEvent event) {
+        long answered = answerGroups.values().stream().filter(g -> g.getSelectedToggle() != null).count();
+        long total = currentExam != null ? currentExam.getQuestions().size() : 0;
+        String message = answered < total
+                ? "You've answered " + answered + " of " + total + " questions. Submit anyway?"
+                : "Submit your exam now? You won't be able to change your answers after this.";
+        if (!NavigationHelper.confirm(message)) {
+            return;
+        }
         doSubmit(false);
     }
 
@@ -122,6 +166,7 @@ public class ExamTakingWindow {
     }
 
     public void onExamSubmitted(ExamAnswer answer) {
+        examInProgress = false;
         statusLabel.setText("Submitted. Auto-graded score: " + answer.getAutoScore()
                 + " (pending teacher confirmation before it appears in your results).");
         questionsView.getItems().clear();
@@ -133,7 +178,8 @@ public class ExamTakingWindow {
 
     public void showError(String message) {
         errorLabel.setText(message);
-        submitButton.setDisable(currentExam == null);
+        startButton.setDisable(false);
+        submitButton.setDisable(currentExam == null || !examInProgress);
     }
 
     /** Renders one question with a radio-button choice per answer. */
