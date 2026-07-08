@@ -14,6 +14,10 @@
 
     <top>
         <VBox spacing="6" style="-fx-padding: 10;">
+            <HBox alignment="CENTER_RIGHT" spacing="8">
+                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+            </HBox>
             <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Study bot"/>
             <HBox alignment="CENTER_LEFT" spacing="8">
                 <Label text="Course:"/>

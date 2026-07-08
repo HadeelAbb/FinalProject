@@ -10,6 +10,11 @@
 <VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.hsts.client.gui.ExamTimeWindow" spacing="10" style="-fx-padding: 15;">
 
+    <HBox alignment="CENTER_RIGHT" spacing="8">
+        <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
+        <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+    </HBox>
+
     <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Extend exam time"/>
     <Label text="Approved exams you created:" style="-fx-text-fill: #666;"/>
 
