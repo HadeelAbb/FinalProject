@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.QuestionManagementWindow">
+
+    <top>
+        <VBox spacing="6" style="-fx-padding: 10;">
+            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Question Bank"/>
+            <Label fx:id="loggedInLabel" style="-fx-text-fill: #555;"/>
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label text="Search topic:"/>
+                <TextField fx:id="searchTopicField" promptText="topic contains..." prefWidth="160"/>
+                <Label text="Difficulty:"/>
+                <ComboBox fx:id="searchDifficultySelector" promptText="Any"/>
+                <Label text="Course:"/>
+                <ComboBox fx:id="searchCourseSelector" promptText="Any"/>
+                <Button fx:id="searchButton" onAction="#handleSearchQuestions" text="Search"/>
+                <Button fx:id="newButton" onAction="#handleNewQuestion" text="New Question"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <left>
+        <ListView fx:id="questionListView" prefWidth="320" BorderPane.alignment="CENTER"/>
+    </left>
+
+    <center>
+        <VBox spacing="8" style="-fx-padding: 10;">
+            <Label text="Question text:"/>
+            <TextArea fx:id="questionTextField" prefHeight="60" wrapText="true"/>
+
+            <Label text="Instructions:"/>
+            <TextArea fx:id="instructionsField" prefHeight="40" wrapText="true"/>
+
+            <Label text="Answers (select the correct one):"/>
+            <GridPane hgap="8" vgap="6">
+                <RadioButton fx:id="answer1Correct" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <TextField fx:id="answer1Field" GridPane.columnIndex="1" GridPane.rowIndex="0" prefWidth="320"/>
+
+                <RadioButton fx:id="answer2Correct" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <TextField fx:id="answer2Field" GridPane.columnIndex="1" GridPane.rowIndex="1" prefWidth="320"/>
+
+                <RadioButton fx:id="answer3Correct" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                <TextField fx:id="answer3Field" GridPane.columnIndex="1" GridPane.rowIndex="2" prefWidth="320"/>
+
+                <RadioButton fx:id="answer4Correct" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                <TextField fx:id="answer4Field" GridPane.columnIndex="1" GridPane.rowIndex="3" prefWidth="320"/>
+            </GridPane>
+
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label text="Difficulty:"/>
+                <ComboBox fx:id="difficultySelector"/>
+                <Label text="Topic:"/>
+                <TextField fx:id="topicField" prefWidth="140"/>
+                <Label text="Course:"/>
+                <ComboBox fx:id="courseSelector"/>
+            </HBox>
+
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label text="Image path:"/>
+                <TextField fx:id="imagePathField" prefWidth="280"/>
+            </HBox>
+
+            <HBox spacing="10">
+                <Button fx:id="saveButton" onAction="#handleSaveQuestion" text="Save"/>
+                <Button fx:id="deleteButton" onAction="#handleDeleteQuestion" text="Delete"/>
+            </HBox>
+
+            <Label fx:id="statusLabel" style="-fx-text-fill: green;" wrapText="true"/>
+            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+        </VBox>
+    </center>
+
+</BorderPane>
