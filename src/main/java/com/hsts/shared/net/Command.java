@@ -16,6 +16,7 @@ public enum Command {
     // ===== Exam building (SUC-2 manual, SUC-3 automatic) =====
     CREATE_EXAM_MANUAL,
     CREATE_EXAM_AUTO,
+    GET_MY_EXAMS,
 
     // ===== Exam approval (SUC-4) =====
     SUBMIT_EXAM_FOR_APPROVAL,
@@ -38,6 +39,11 @@ public enum Command {
 
     // ===== Changing exam time mid-execution (SUC-17) =====
     EXTEND_EXAM_TIME,
+
+    // ===== Study bot (SUC-13 teacher stats, SUC-14 ask, SUC-15 history) =====
+    ASK_BOT_QUESTION,
+    GET_BOT_HISTORY,
+    GET_BOT_USAGE_STATS,
 
     // NEW: generic broadcast event, published by the server-side EventBus
     // whenever exam status, grading, or timing changes in a way that
