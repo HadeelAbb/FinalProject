@@ -131,6 +131,27 @@ public class QuestionManagementWindow {
         loggedInLabel.setText("Logged in as: " + user.getFullName());
     }
 
+    private User navUser;
+    private com.hsts.client.network.ServerConnection navClient;
+    private com.hsts.client.controller.LoginClientController navLoginController;
+
+    public void setNavigation(User user, com.hsts.client.network.ServerConnection client,
+                               com.hsts.client.controller.LoginClientController loginController) {
+        this.navUser = user;
+        this.navClient = client;
+        this.navLoginController = loginController;
+    }
+
+    @FXML
+    private void handleBack() {
+        NavigationHelper.goToDashboard(loggedInLabel, navUser, navClient, navLoginController);
+    }
+
+    @FXML
+    private void handleLogout() {
+        NavigationHelper.logoutWithConfirmation(loggedInLabel, navClient, navLoginController);
+    }
+
     @FXML
     private void handleSearchQuestions() {
         if (!suppressMessageClear) {

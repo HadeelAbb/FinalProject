@@ -30,6 +30,10 @@ import java.io.IOException;
  * Landing screen after login (SUC-9). Shows only the actions relevant to
  * the logged-in user's role, then hands off to the corresponding screen -
  * same pattern LoginWindow already used for QuestionManagementWindow.
+ *
+ * Every downstream screen gets (user, client, loginController) passed
+ * through its init() so it can call back into NavigationHelper for its
+ * own Back/Logout buttons without needing to reconstruct any of this.
  */
 public class DashboardWindow {
 
@@ -83,6 +87,11 @@ public class DashboardWindow {
     }
 
     @FXML
+    void handleLogout(ActionEvent event) {
+        NavigationHelper.logoutWithConfirmation(welcomeLabel, client, loginController);
+    }
+
+    @FXML
     void handleQuestions(ActionEvent event) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/question_management.fxml"));
@@ -94,6 +103,7 @@ public class DashboardWindow {
             }
             qmw.setController(controller);
             qmw.setLoggedInUser(user);
+            qmw.setNavigation(user, client, loginController);
             switchScene(root, "HSTS - Question Bank");
         } catch (IOException e) {
             showError("Could not open question bank screen.");
@@ -108,7 +118,7 @@ public class DashboardWindow {
             ExamBuilderWindow ebw = loader.getController();
             ExamBuilderClientController controller = new ExamBuilderClientController(client);
             controller.setCurrentTeacher((Teacher) user);
-            ebw.init(controller, (Teacher) user);
+            ebw.init(controller, (Teacher) user, client, loginController);
             switchScene(root, "HSTS - Build Exam");
         } catch (IOException e) {
             showError("Could not open exam builder screen.");
@@ -122,7 +132,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             GradingWindow gw = loader.getController();
             GradingClientController controller = new GradingClientController(client);
-            gw.init(controller, (Teacher) user);
+            gw.init(controller, (Teacher) user, client, loginController);
             switchScene(root, "HSTS - Grade Exams");
         } catch (IOException e) {
             showError("Could not open grading screen.");
@@ -136,7 +146,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             ApprovalWindow aw = loader.getController();
             ApprovalClientController controller = new ApprovalClientController(client);
-            aw.init(controller, (SubjectCoordinator) user);
+            aw.init(controller, (SubjectCoordinator) user, client, loginController);
             switchScene(root, "HSTS - Approve Exams");
         } catch (IOException e) {
             showError("Could not open approval screen.");
@@ -150,7 +160,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             ExamTakingWindow etw = loader.getController();
             ExamTakingClientController controller = new ExamTakingClientController(client);
-            etw.init(controller, (Student) user);
+            etw.init(controller, (Student) user, client, loginController);
             switchScene(root, "HSTS - Take Exam");
         } catch (IOException e) {
             showError("Could not open exam-taking screen.");
@@ -164,7 +174,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             ResultsWindow rw = loader.getController();
             ResultsClientController controller = new ResultsClientController(client);
-            rw.init(controller, (Student) user);
+            rw.init(controller, (Student) user, client, loginController);
             switchScene(root, "HSTS - My Results");
         } catch (IOException e) {
             showError("Could not open results screen.");
@@ -178,7 +188,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             ExamTimeWindow etw = loader.getController();
             ExamTimeClientController controller = new ExamTimeClientController(client);
-            etw.init(controller, (Teacher) user);
+            etw.init(controller, (Teacher) user, client, loginController);
             switchScene(root, "HSTS - Extend Exam Time");
         } catch (IOException e) {
             showError("Could not open extend-time screen.");
@@ -192,7 +202,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             BotStatsWindow bsw = loader.getController();
             BotStatsClientController controller = new BotStatsClientController(client);
-            bsw.init(controller, (Teacher) user);
+            bsw.init(controller, (Teacher) user, client, loginController);
             switchScene(root, "HSTS - Bot Usage Stats");
         } catch (IOException e) {
             showError("Could not open bot stats screen.");
@@ -206,7 +216,7 @@ public class DashboardWindow {
             Parent root = loader.load();
             BotChatWindow bcw = loader.getController();
             BotChatClientController controller = new BotChatClientController(client);
-            bcw.init(controller, (Student) user);
+            bcw.init(controller, (Student) user, client, loginController);
             switchScene(root, "HSTS - Study Bot");
         } catch (IOException e) {
             showError("Could not open study bot screen.");
