@@ -1,3 +1,16 @@
 target/
+build/
+out/
 *.rar
+*.class
+
+# IntelliJ
+.idea/
+*.iml
+
+# DB credentials - never commit this
 src/main/resources/config.properties
+
+# OS junk
+.DS_Store
+Thumbs.db
