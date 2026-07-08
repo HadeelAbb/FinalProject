@@ -168,6 +168,57 @@ public class SmokeTest {
         check(extend.isSuccess(), "extend exam time: " + extend.getMessage());
         check(((Exam) extend.getPayload()).getDurationMinutes() == 25, "duration extended to 25");
 
+        Response myExams = sim.process(Command.GET_MY_EXAMS, new GetMyExamsData(teacher.getId()));
+        check(myExams.isSuccess(), "get my exams");
+        @SuppressWarnings("unchecked")
+        List<Exam> myExamsList = (List<Exam>) myExams.getPayload();
+        check(myExamsList.size() >= 5, "teacher has at least 5 exams created, got " + myExamsList.size());
+
+        // 11. Study bot - happy path
+        Response ask = sim.process(Command.ASK_BOT_QUESTION,
+                new AskBotQuestionData(student.getId(), "11", "What is a binary search tree?"));
+        check(ask.isSuccess(), "ask bot: " + ask.getMessage());
+        BotInteraction interaction = (BotInteraction) ask.getPayload();
+        check(interaction.getAnswer() != null && !interaction.getAnswer().isBlank(), "bot answer is non-empty");
+
+        Response askUnenrolled = sim.process(Command.ASK_BOT_QUESTION,
+                new AskBotQuestionData(student.getId(), "99", "Question about a course I'm not in"));
+        check(!askUnenrolled.isSuccess(), "asking bot about unenrolled course should fail");
+
+        Response askBlank = sim.process(Command.ASK_BOT_QUESTION,
+                new AskBotQuestionData(student.getId(), "11", ""));
+        check(!askBlank.isSuccess(), "asking bot a blank question should fail");
+
+        Response history = sim.process(Command.GET_BOT_HISTORY, new GetBotHistoryData(student.getId()));
+        check(history.isSuccess(), "get bot history");
+        @SuppressWarnings("unchecked")
+        List<BotInteraction> historyList = (List<BotInteraction>) history.getPayload();
+        check(historyList.size() == 1, "1 bot interaction in history, got " + historyList.size());
+
+        // Bot should be blocked while student has an exam in progress for that course
+        Response createManual5 = sim.process(Command.CREATE_EXAM_MANUAL,
+                new CreateExamManualData(teacher.getId(), "11", "Blocking exam", "", qIds, 30));
+        Exam exam5 = (Exam) createManual5.getPayload();
+        sim.process(Command.SUBMIT_EXAM_FOR_APPROVAL, new SubmitExamForApprovalData(exam5.getExamId(), teacher.getId()));
+        sim.process(Command.APPROVE_EXAM, new ExamApprovalDecisionData(exam5.getExamId(), coord.getId(), null));
+        sim.process(Command.START_EXAM, new StartExamData(exam5.getExamId(), student.getId()));
+        Response askDuringExam = sim.process(Command.ASK_BOT_QUESTION,
+                new AskBotQuestionData(student.getId(), "11", "Can I ask during my exam?"));
+        check(!askDuringExam.isSuccess(), "bot should be blocked while an exam is in progress for that course");
+        // clean up the in-progress exam so it doesn't affect nothing else downstream
+        sim.process(Command.SUBMIT_EXAM, new SubmitExamData(exam5.getExamId(), student.getId(), Map.of(), true));
+
+        // 12. Teacher bot usage stats - anonymized
+        Response stats = sim.process(Command.GET_BOT_USAGE_STATS, new GetBotUsageStatsData(teacher.getId()));
+        check(stats.isSuccess(), "get bot usage stats");
+        @SuppressWarnings("unchecked")
+        List<BotUsageStats> statsList = (List<BotUsageStats>) stats.getPayload();
+        BotUsageStats course11Stats = statsList.stream().filter(s -> s.getCourseId().equals("11")).findFirst().orElse(null);
+        check(course11Stats != null && course11Stats.getTotalQuestions() == 1,
+                "course 11 bot stats show 1 question, got " + (course11Stats != null ? course11Stats.getTotalQuestions() : "null"));
+        check(course11Stats != null && course11Stats.getUniqueStudents() == 1,
+                "course 11 bot stats show 1 unique student, got " + (course11Stats != null ? course11Stats.getUniqueStudents() : "null"));
+
         System.out.println();
         if (failCount == 0) {
             System.out.println("ALL CHECKS PASSED");
