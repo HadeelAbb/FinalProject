@@ -32,7 +32,7 @@
 
     <PasswordField fx:id="passwordField" promptText="password" />
 
-    <Button fx:id="loginButton" mnemonicParsing="false" onAction="#onLoginButtonClick" text="login">
+    <Button fx:id="loginButton" mnemonicParsing="false" onAction="#onLoginButtonClick" text="login" defaultButton="true">
         <VBox.margin>
             <Insets top="10.0" />
         </VBox.margin>
