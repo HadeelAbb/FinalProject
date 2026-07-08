@@ -20,6 +20,10 @@
 
     <top>
         <VBox spacing="6" style="-fx-padding: 10;">
+            <HBox alignment="CENTER_RIGHT" spacing="8">
+                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+            </HBox>
             <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Build an exam"/>
             <HBox alignment="CENTER_LEFT" spacing="8">
                 <Label text="Course:"/>
@@ -38,20 +42,24 @@
 
     <left>
         <VBox spacing="8" style="-fx-padding: 10;" prefWidth="340">
-            <Label text="Manual mode: check questions to include"/>
-            <ListView fx:id="questionListView" prefHeight="360"/>
+            <VBox fx:id="manualModeBox" spacing="8">
+                <Label text="Manual mode: check questions to include"/>
+                <ListView fx:id="questionListView" prefHeight="360"/>
+            </VBox>
 
-            <Label text="Automatic mode: filter criteria"/>
-            <HBox spacing="6" alignment="CENTER_LEFT">
-                <Label text="Topic:"/>
-                <TextField fx:id="autoTopicField" prefWidth="120"/>
-            </HBox>
-            <HBox spacing="6" alignment="CENTER_LEFT">
-                <Label text="Difficulty:"/>
-                <ComboBox fx:id="autoDifficultySelector" promptText="Any"/>
-                <Label text="Count:"/>
-                <Spinner fx:id="autoCountSpinner" prefWidth="70" editable="true"/>
-            </HBox>
+            <VBox fx:id="autoModeBox" spacing="8">
+                <Label text="Automatic mode: filter criteria"/>
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label text="Topic:"/>
+                    <TextField fx:id="autoTopicField" prefWidth="120"/>
+                </HBox>
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label text="Difficulty:"/>
+                    <ComboBox fx:id="autoDifficultySelector" promptText="Any"/>
+                    <Label text="Count:"/>
+                    <Spinner fx:id="autoCountSpinner" prefWidth="70" editable="true"/>
+                </HBox>
+            </VBox>
         </VBox>
     </left>
 

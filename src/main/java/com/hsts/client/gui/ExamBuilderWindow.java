@@ -1,15 +1,17 @@
 package com.hsts.client.gui;
 
 import com.hsts.client.controller.ExamBuilderClientController;
+import com.hsts.client.controller.LoginClientController;
+import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
-import com.hsts.shared.model.ExamStatus;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.Teacher;
+import com.hsts.shared.model.User;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -19,32 +21,45 @@ import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ExamBuilderWindow {
 
+    @FXML private Button backButton;
+    @FXML private Button logoutButton;
     @FXML private ComboBox<Course> courseSelector;
     @FXML private TextField titleField;
     @FXML private Spinner<Integer> durationSpinner;
     @FXML private RadioButton manualModeRadio;
     @FXML private RadioButton autoModeRadio;
+    @FXML private VBox manualModeBox;
+    @FXML private VBox autoModeBox;
     @FXML private ListView<QuestionCheckItem> questionListView;
     @FXML private TextField autoTopicField;
     @FXML private ComboBox<Difficulty> autoDifficultySelector;
     @FXML private Spinner<Integer> autoCountSpinner;
     @FXML private TextArea instructionsField;
+    @FXML private Button createButton;
     @FXML private Label draftSummaryLabel;
     @FXML private Label statusLabel;
     @FXML private Label errorLabel;
 
     private ExamBuilderClientController controller;
     private Teacher currentTeacher;
+    private User navUser;
+    private ServerConnection navClient;
+    private LoginClientController navLoginController;
 
-    public void init(ExamBuilderClientController controller, Teacher teacher) {
+    public void init(ExamBuilderClientController controller, Teacher teacher,
+                      ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.currentTeacher = teacher;
+        this.navUser = teacher;
+        this.navClient = client;
+        this.navLoginController = loginController;
         controller.setView(this);
 
         courseSelector.getItems().setAll(teacher.getCourses());
@@ -55,10 +70,32 @@ public class ExamBuilderWindow {
         autoCountSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 50, 5, 1));
         autoDifficultySelector.getItems().setAll(Difficulty.values());
 
+        questionListView.setPlaceholder(new Label("Select a course to see its questions."));
+
         ToggleGroup modeGroup = new ToggleGroup();
         manualModeRadio.setToggleGroup(modeGroup);
         autoModeRadio.setToggleGroup(modeGroup);
         manualModeRadio.setSelected(true);
+        updateModeVisibility();
+        modeGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> updateModeVisibility());
+    }
+
+    private void updateModeVisibility() {
+        boolean manual = manualModeRadio.isSelected();
+        manualModeBox.setVisible(manual);
+        manualModeBox.setManaged(manual);
+        autoModeBox.setVisible(!manual);
+        autoModeBox.setManaged(!manual);
+    }
+
+    @FXML
+    void handleBack(ActionEvent event) {
+        NavigationHelper.goToDashboard(backButton, navUser, navClient, navLoginController);
+    }
+
+    @FXML
+    void handleLogout(ActionEvent event) {
+        NavigationHelper.logoutWithConfirmation(logoutButton, navClient, navLoginController);
     }
 
     public void displayQuestionBank(List<Question> questions) {
@@ -79,6 +116,8 @@ public class ExamBuilderWindow {
             showError("Choose a course and enter a title.");
             return;
         }
+        createButton.setDisable(true);
+        statusLabel.setText("Creating exam...");
         if (manualModeRadio.isSelected()) {
             List<String> ids = new ArrayList<>();
             for (QuestionCheckItem item : questionListView.getItems()) {
@@ -105,6 +144,7 @@ public class ExamBuilderWindow {
     }
 
     public void onExamCreated(Exam exam) {
+        createButton.setDisable(false);
         draftSummaryLabel.setText(exam.getTitle() + " - " + exam.getQuestions().size() + " questions, "
                 + exam.getDurationMinutes() + " min, status: " + exam.getStatus());
         statusLabel.setText("Draft created. Review it, then submit for approval.");
@@ -116,6 +156,7 @@ public class ExamBuilderWindow {
     }
 
     public void showError(String message) {
+        createButton.setDisable(false);
         errorLabel.setText(message);
         statusLabel.setText("");
     }
