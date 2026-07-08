@@ -15,9 +15,12 @@
         <Button fx:id="questionsButton" onAction="#handleQuestions" text="Manage question bank" maxWidth="Infinity"/>
         <Button fx:id="buildExamButton" onAction="#handleBuildExam" text="Build an exam" maxWidth="Infinity"/>
         <Button fx:id="gradeExamsButton" onAction="#handleGradeExams" text="Grade submitted exams" maxWidth="Infinity"/>
+        <Button fx:id="extendTimeButton" onAction="#handleExtendTime" text="Extend exam time" maxWidth="Infinity"/>
+        <Button fx:id="botStatsButton" onAction="#handleBotStats" text="Bot usage stats" maxWidth="Infinity"/>
         <Button fx:id="approveExamsButton" onAction="#handleApproveExams" text="Approve pending exams" maxWidth="Infinity"/>
         <Button fx:id="takeExamButton" onAction="#handleTakeExam" text="Take an exam" maxWidth="Infinity"/>
         <Button fx:id="myResultsButton" onAction="#handleMyResults" text="View my results" maxWidth="Infinity"/>
+        <Button fx:id="botChatButton" onAction="#handleBotChat" text="Ask the study bot" maxWidth="Infinity"/>
     </VBox>
 
     <Label fx:id="errorLabel" style="-fx-text-fill: red;"/>

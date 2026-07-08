@@ -1,8 +1,11 @@
 package com.hsts.client.gui;
 
 import com.hsts.client.controller.ApprovalClientController;
+import com.hsts.client.controller.BotChatClientController;
+import com.hsts.client.controller.BotStatsClientController;
 import com.hsts.client.controller.ExamBuilderClientController;
 import com.hsts.client.controller.ExamTakingClientController;
+import com.hsts.client.controller.ExamTimeClientController;
 import com.hsts.client.controller.GradingClientController;
 import com.hsts.client.controller.LoginClientController;
 import com.hsts.client.controller.QuestionClientController;
@@ -39,6 +42,9 @@ public class DashboardWindow {
     @FXML private Button approveExamsButton;
     @FXML private Button takeExamButton;
     @FXML private Button myResultsButton;
+    @FXML private Button extendTimeButton;
+    @FXML private Button botStatsButton;
+    @FXML private Button botChatButton;
 
     private User user;
     private ServerConnection client;
@@ -68,6 +74,12 @@ public class DashboardWindow {
         takeExamButton.setManaged(isStudent);
         myResultsButton.setVisible(isStudent);
         myResultsButton.setManaged(isStudent);
+        extendTimeButton.setVisible(isTeacher);
+        extendTimeButton.setManaged(isTeacher);
+        botStatsButton.setVisible(isTeacher);
+        botStatsButton.setManaged(isTeacher);
+        botChatButton.setVisible(isStudent);
+        botChatButton.setManaged(isStudent);
     }
 
     @FXML
@@ -156,6 +168,48 @@ public class DashboardWindow {
             switchScene(root, "HSTS - My Results");
         } catch (IOException e) {
             showError("Could not open results screen.");
+        }
+    }
+
+    @FXML
+    void handleExtendTime(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/exam_time.fxml"));
+            Parent root = loader.load();
+            ExamTimeWindow etw = loader.getController();
+            ExamTimeClientController controller = new ExamTimeClientController(client);
+            etw.init(controller, (Teacher) user);
+            switchScene(root, "HSTS - Extend Exam Time");
+        } catch (IOException e) {
+            showError("Could not open extend-time screen.");
+        }
+    }
+
+    @FXML
+    void handleBotStats(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/bot_stats.fxml"));
+            Parent root = loader.load();
+            BotStatsWindow bsw = loader.getController();
+            BotStatsClientController controller = new BotStatsClientController(client);
+            bsw.init(controller, (Teacher) user);
+            switchScene(root, "HSTS - Bot Usage Stats");
+        } catch (IOException e) {
+            showError("Could not open bot stats screen.");
+        }
+    }
+
+    @FXML
+    void handleBotChat(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/bot_chat.fxml"));
+            Parent root = loader.load();
+            BotChatWindow bcw = loader.getController();
+            BotChatClientController controller = new BotChatClientController(client);
+            bcw.init(controller, (Student) user);
+            switchScene(root, "HSTS - Study Bot");
+        } catch (IOException e) {
+            showError("Could not open study bot screen.");
         }
     }
 
