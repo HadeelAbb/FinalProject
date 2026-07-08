@@ -32,6 +32,7 @@ public enum Command {
     // ===== Grading (SUC-7 automatic, SUC-8 teacher confirmation) =====
     GET_PENDING_GRADING,
     CONFIRM_GRADE,
+    GET_EXAM_DETAIL,
 
     // ===== Viewing results (SUC-10) =====
     GET_MY_RESULTS,

@@ -27,6 +27,7 @@ import com.hsts.shared.net.dto.ExtendExamTimeData;
 import com.hsts.shared.net.dto.GetAvailableExamsData;
 import com.hsts.shared.net.dto.GetBotHistoryData;
 import com.hsts.shared.net.dto.GetBotUsageStatsData;
+import com.hsts.shared.net.dto.GetExamDetailData;
 import com.hsts.shared.net.dto.GetExamAnswerCopyData;
 import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.GetMyResultsData;
@@ -186,6 +187,7 @@ public class MockServerSimulator {
 
             case GET_PENDING_GRADING -> handleGetPendingGrading((GetPendingGradingData) payload);
             case CONFIRM_GRADE -> handleConfirmGrade((ConfirmGradeData) payload);
+            case GET_EXAM_DETAIL -> handleGetExamDetail((GetExamDetailData) payload);
 
             case GET_MY_RESULTS -> handleGetMyResults((GetMyResultsData) payload);
             case GET_EXAM_ANSWER_COPY -> handleGetExamAnswerCopy((GetExamAnswerCopyData) payload);
@@ -473,6 +475,14 @@ public class MockServerSimulator {
     }
 
     // ===================== SUC-7 / SUC-8: grading & confirmation =====================
+
+    private Response handleGetExamDetail(GetExamDetailData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.GET_EXAM_DETAIL, "Exam not found.", null);
+        }
+        return Response.success(Command.GET_EXAM_DETAIL, exam, null, null);
+    }
 
     private Response handleGetPendingGrading(GetPendingGradingData data) {
         List<ExamAnswer> pending = examAnswers.stream()
