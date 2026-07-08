@@ -4,29 +4,38 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.hsts.client.gui.ExamTimeWindow" spacing="10" style="-fx-padding: 15;">
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.ExamTimeWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
-    <HBox alignment="CENTER_RIGHT" spacing="8">
-        <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-        <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
-    </HBox>
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+            <Label text="Extend exam time" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+            <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+            <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
+        </HBox>
+    </top>
 
-    <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Extend exam time"/>
-    <Label text="Approved exams you created:" style="-fx-text-fill: #666;"/>
+    <center>
+        <VBox spacing="10" style="-fx-padding: 20;">
+            <Label text="Approved exams you created:" style="-fx-text-fill: #666;"/>
 
-    <ListView fx:id="examListView" prefHeight="320"/>
+            <ListView fx:id="examListView" prefHeight="320"/>
 
-    <HBox spacing="8" alignment="CENTER_LEFT">
-        <Label text="Additional minutes:"/>
-        <Spinner fx:id="minutesSpinner" prefWidth="90" editable="true"/>
-        <Button fx:id="extendButton" onAction="#handleExtend" text="Extend"/>
-        <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh"/>
-    </HBox>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Additional minutes:"/>
+                <Spinner fx:id="minutesSpinner" prefWidth="90" editable="true"/>
+                <Button fx:id="extendButton" onAction="#handleExtend" text="Extend" styleClass="primary-button"/>
+                <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
+            </HBox>
 
-    <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
-    <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
-</VBox>
+            <Label fx:id="statusLabel" styleClass="status-success"/>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+        </VBox>
+    </center>
+
+</BorderPane>

@@ -8,18 +8,19 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" prefHeight="300.0" prefWidth="400.0" spacing="15.0"
+<VBox alignment="CENTER" prefHeight="320.0" prefWidth="400.0" spacing="15.0"
       xmlns="http://javafx.com/javafx/17"
       xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.hsts.client.gui.LoginWindow">
+      fx:controller="com.hsts.client.gui.LoginWindow"
+      styleClass="body-pane" stylesheets="@app.css">
 
     <padding>
         <Insets bottom="40.0" left="40.0" right="40.0" top="40.0" />
     </padding>
 
-    <Label text="HSTS Login">
+    <Label text="HSTS Login" style="-fx-text-fill: #1f4e79;">
         <font>
-            <Font name="System Bold" size="24.0" />
+            <Font name="System Bold" size="26.0" />
         </font>
         <VBox.margin>
             <Insets bottom="20.0" />
@@ -28,11 +29,12 @@
 
     <TextField fx:id="usernameField" promptText="username" />
 
-    <Label fx:id="errorLabel" textFill="RED" />
+    <Label fx:id="errorLabel" styleClass="status-error" />
 
     <PasswordField fx:id="passwordField" promptText="password" />
 
-    <Button fx:id="loginButton" mnemonicParsing="false" onAction="#onLoginButtonClick" text="login" defaultButton="true">
+    <Button fx:id="loginButton" mnemonicParsing="false" onAction="#onLoginButtonClick" text="login"
+            defaultButton="true" styleClass="primary-button" maxWidth="Infinity">
         <VBox.margin>
             <Insets top="10.0" />
         </VBox.margin>

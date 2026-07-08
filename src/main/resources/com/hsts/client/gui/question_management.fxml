@@ -14,26 +14,29 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.hsts.client.gui.QuestionManagementWindow">
+            fx:controller="com.hsts.client.gui.QuestionManagementWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
     <top>
-        <VBox spacing="6" style="-fx-padding: 10;">
-            <HBox alignment="CENTER_RIGHT" spacing="8">
-                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+        <VBox>
+            <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+                <Label text="Question Bank" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
             </HBox>
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Question Bank"/>
-            <Label fx:id="loggedInLabel" style="-fx-text-fill: #555;"/>
-            <HBox alignment="CENTER_LEFT" spacing="8">
-                <Label text="Search topic:"/>
-                <TextField fx:id="searchTopicField" promptText="topic contains..." prefWidth="160"/>
-                <Label text="Difficulty:"/>
-                <ComboBox fx:id="searchDifficultySelector" promptText="Any"/>
-                <Label text="Course:"/>
-                <ComboBox fx:id="searchCourseSelector" promptText="Any"/>
-                <Button fx:id="searchButton" onAction="#handleSearchQuestions" text="Search"/>
-                <Button fx:id="newButton" onAction="#handleNewQuestion" text="New Question"/>
-            </HBox>
+            <VBox spacing="6" style="-fx-padding: 12 10 10 10;">
+                <Label fx:id="loggedInLabel" style="-fx-text-fill: #555;"/>
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <Label text="Search topic:"/>
+                    <TextField fx:id="searchTopicField" promptText="topic contains..." prefWidth="160"/>
+                    <Label text="Difficulty:"/>
+                    <ComboBox fx:id="searchDifficultySelector" promptText="Any"/>
+                    <Label text="Course:"/>
+                    <ComboBox fx:id="searchCourseSelector" promptText="Any"/>
+                    <Button fx:id="searchButton" onAction="#handleSearchQuestions" text="Search" styleClass="action-button"/>
+                    <Button fx:id="newButton" onAction="#handleNewQuestion" text="New Question" styleClass="action-button"/>
+                </HBox>
+            </VBox>
         </VBox>
     </top>
 
@@ -79,12 +82,12 @@
             </HBox>
 
             <HBox spacing="10">
-                <Button fx:id="saveButton" onAction="#handleSaveQuestion" text="Save"/>
-                <Button fx:id="deleteButton" onAction="#handleDeleteQuestion" text="Delete"/>
+                <Button fx:id="saveButton" onAction="#handleSaveQuestion" text="Save" styleClass="primary-button"/>
+                <Button fx:id="deleteButton" onAction="#handleDeleteQuestion" text="Delete" styleClass="action-button"/>
             </HBox>
 
-            <Label fx:id="statusLabel" style="-fx-text-fill: green;" wrapText="true"/>
-            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+            <Label fx:id="statusLabel" styleClass="status-success" wrapText="true"/>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
         </VBox>
     </center>
 

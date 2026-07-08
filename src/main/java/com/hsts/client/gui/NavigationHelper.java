@@ -36,7 +36,7 @@ public final class NavigationHelper {
 
             Stage stage = (Stage) anyNodeInScene.getScene().getWindow();
             stage.setTitle("HSTS - Dashboard");
-            stage.setScene(new Scene(root));
+            stage.setScene(new Scene(root, 520, 680));
         } catch (IOException e) {
             // Nothing sensible to show the user here beyond staying put -
             // the Dashboard failing to load is a packaging problem, not a
@@ -73,7 +73,7 @@ public final class NavigationHelper {
 
             Stage stage = (Stage) anyNodeInScene.getScene().getWindow();
             stage.setTitle("HSTS - Login");
-            stage.setScene(new Scene(root));
+            stage.setScene(new Scene(root, 360, 280));
         } catch (IOException e) {
             // Same reasoning as above - a packaging problem, not something to show the user.
         }

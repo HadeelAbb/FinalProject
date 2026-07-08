@@ -3,38 +3,65 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.hsts.client.gui.DashboardWindow">
+            fx:controller="com.hsts.client.gui.DashboardWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
     <top>
-        <HBox alignment="CENTER_RIGHT" style="-fx-padding: 8;">
-            <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
-        </HBox>
+        <VBox styleClass="top-bar">
+            <HBox alignment="CENTER_LEFT" spacing="12" style="-fx-padding: 16 24 16 24;">
+                <VBox HBox.hgrow="ALWAYS" spacing="2">
+                    <Label fx:id="welcomeLabel" styleClass="top-bar-title"/>
+                    <Label fx:id="roleLabel" styleClass="top-bar-subtitle"/>
+                </VBox>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
+            </HBox>
+        </VBox>
     </top>
 
     <center>
-        <VBox spacing="12" style="-fx-padding: 20;">
+        <VBox spacing="20" style="-fx-padding: 28 32 28 32;" maxWidth="480" BorderPane.alignment="TOP_CENTER">
 
-            <Label fx:id="welcomeLabel" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
-            <Label fx:id="roleLabel" style="-fx-text-fill: #555;"/>
+            <VBox spacing="8">
+                <Label text="Question Bank" styleClass="section-label"/>
+                <Separator/>
+                <Button fx:id="questionsButton" onAction="#handleQuestions" text="Manage question bank"
+                        maxWidth="Infinity" styleClass="action-button"/>
+            </VBox>
 
-    <VBox spacing="8" style="-fx-padding: 20 0 0 0;">
-        <Button fx:id="questionsButton" onAction="#handleQuestions" text="Manage question bank" maxWidth="Infinity"/>
-        <Button fx:id="buildExamButton" onAction="#handleBuildExam" text="Build an exam" maxWidth="Infinity"/>
-        <Button fx:id="gradeExamsButton" onAction="#handleGradeExams" text="Grade submitted exams" maxWidth="Infinity"/>
-        <Button fx:id="extendTimeButton" onAction="#handleExtendTime" text="Extend exam time" maxWidth="Infinity"/>
-        <Button fx:id="botStatsButton" onAction="#handleBotStats" text="Bot usage stats" maxWidth="Infinity"/>
-        <Button fx:id="approveExamsButton" onAction="#handleApproveExams" text="Approve pending exams" maxWidth="Infinity"/>
-        <Button fx:id="takeExamButton" onAction="#handleTakeExam" text="Take an exam" maxWidth="Infinity"/>
-        <Button fx:id="myResultsButton" onAction="#handleMyResults" text="View my results" maxWidth="Infinity"/>
-        <Button fx:id="botChatButton" onAction="#handleBotChat" text="Ask the study bot" maxWidth="Infinity"/>
-    </VBox>
+            <VBox spacing="8">
+                <Label text="Exams" styleClass="section-label"/>
+                <Separator/>
+                <Button fx:id="buildExamButton" onAction="#handleBuildExam" text="Build an exam"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="approveExamsButton" onAction="#handleApproveExams" text="Approve pending exams"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="takeExamButton" onAction="#handleTakeExam" text="Take an exam"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="gradeExamsButton" onAction="#handleGradeExams" text="Grade submitted exams"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="extendTimeButton" onAction="#handleExtendTime" text="Extend exam time"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="myResultsButton" onAction="#handleMyResults" text="View my results"
+                        maxWidth="Infinity" styleClass="action-button"/>
+            </VBox>
 
-    <Label fx:id="errorLabel" style="-fx-text-fill: red;"/>
+            <VBox spacing="8">
+                <Label text="Study Bot" styleClass="section-label"/>
+                <Separator/>
+                <Button fx:id="botChatButton" onAction="#handleBotChat" text="Ask the study bot"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="botStatsButton" onAction="#handleBotStats" text="Bot usage stats"
+                        maxWidth="Infinity" styleClass="action-button"/>
+            </VBox>
+
+            <Label fx:id="errorLabel" styleClass="status-error"/>
         </VBox>
     </center>
+
 </BorderPane>
