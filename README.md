@@ -4,19 +4,22 @@ Group 5, course 203.3140 (Software Engineering), University of Haifa.
 
 ## Status (as of this repo's creation)
 
-**Done and working:**
+**Done and working (Partner 3 / client scope - complete):**
 - Login/logout (SUC-9)
 - Question bank management - create/edit/delete/search (SUC-1, SUC-16)
-- Full client GUI for the exam lifecycle (SUC-2, SUC-3, SUC-4, SUC-6, SUC-7,
-  SUC-8, SUC-10, protocol-level support for SUC-17), tested end-to-end
-  against `MockServerSimulator` - see `src/test/java/.../SmokeTest.java`
+- Full client GUI for the exam lifecycle: build manual/auto (SUC-2/3),
+  approval (SUC-4), taking with a live timer (SUC-6), grading (SUC-7/8),
+  results (SUC-10), extending time mid-exam (SUC-17)
+- Study bot: ask/history (SUC-14/15), anonymized teacher-facing usage
+  stats (SUC-13)
+- All of the above tested end-to-end against `MockServerSimulator` -
+  see `src/test/java/.../SmokeTest.java`, 45 checks, all passing
 
-**Not built yet:**
+**Not built (out of client scope, needed from teammates):**
 - Real server-side implementation (DB-backed controllers replacing the
   mock) - see "Division of work" below
-- Bot (SUC-13, SUC-14, SUC-15)
-- Exam-taking screen doesn't yet expose SUC-17 (extend time) as a button,
-  though the protocol/mock support it
+- Real external AI API call for the bot (currently a canned placeholder
+  answer - see the TODO in `MockServerSimulator.handleAskBot`)
 
 ## Division of work
 
@@ -31,8 +34,8 @@ against. From there:
 - **Protocol / networking (Partner 2):** wire the new `Command`s into
   `ServerRequestRouter`, and finish `EventBus` targeted delivery (see
   the TODO in `EventBus.java` - needs a userId -> connection registry).
-- **Client / GUI (Partner 3):** done for the scope above; bot screens
-  (SUC-13/14/15) still pending.
+- **Client / GUI (Partner 3):** done - login, question bank, full exam
+  lifecycle, and the bot, all tested against the mock server.
 
 ## Running
 
