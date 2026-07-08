@@ -16,27 +16,30 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.hsts.client.gui.ExamBuilderWindow">
+            fx:controller="com.hsts.client.gui.ExamBuilderWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
     <top>
-        <VBox spacing="6" style="-fx-padding: 10;">
-            <HBox alignment="CENTER_RIGHT" spacing="8">
-                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+        <VBox>
+            <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+                <Label text="Build an exam" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
             </HBox>
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Build an exam"/>
-            <HBox alignment="CENTER_LEFT" spacing="8">
-                <Label text="Course:"/>
-                <ComboBox fx:id="courseSelector" promptText="Select course"/>
-                <Label text="Title:"/>
-                <TextField fx:id="titleField" prefWidth="220"/>
-                <Label text="Duration (min):"/>
-                <Spinner fx:id="durationSpinner" prefWidth="90" editable="true"/>
-            </HBox>
-            <HBox alignment="CENTER_LEFT" spacing="8">
-                <RadioButton fx:id="manualModeRadio" text="Manual - pick questions"/>
-                <RadioButton fx:id="autoModeRadio" text="Automatic - by topic/difficulty"/>
-            </HBox>
+            <VBox spacing="6" style="-fx-padding: 12 10 10 10;">
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <Label text="Course:"/>
+                    <ComboBox fx:id="courseSelector" promptText="Select course"/>
+                    <Label text="Title:"/>
+                    <TextField fx:id="titleField" prefWidth="220"/>
+                    <Label text="Duration (min):"/>
+                    <Spinner fx:id="durationSpinner" prefWidth="90" editable="true"/>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <RadioButton fx:id="manualModeRadio" text="Manual - pick questions"/>
+                    <RadioButton fx:id="autoModeRadio" text="Automatic - by topic/difficulty"/>
+                </HBox>
+            </VBox>
         </VBox>
     </top>
 
@@ -69,15 +72,15 @@
             <TextArea fx:id="instructionsField" prefHeight="100" wrapText="true"/>
 
             <HBox spacing="8">
-                <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)"/>
+                <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)" styleClass="primary-button"/>
                 <Button fx:id="submitForApprovalButton" onAction="#handleSubmitForApproval"
-                        text="Submit for approval" disable="true"/>
+                        text="Submit for approval" disable="true" styleClass="action-button"/>
             </HBox>
 
             <Label text="Current draft:" style="-fx-font-weight: bold;"/>
             <Label fx:id="draftSummaryLabel" wrapText="true"/>
-            <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
-            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+            <Label fx:id="statusLabel" styleClass="status-success"/>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
         </VBox>
     </center>
 

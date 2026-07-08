@@ -3,23 +3,32 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.hsts.client.gui.BotStatsWindow" spacing="10" style="-fx-padding: 15;">
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.BotStatsWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
-    <HBox alignment="CENTER_RIGHT" spacing="8">
-        <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-        <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
-    </HBox>
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+            <Label text="Bot usage (anonymized)" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+            <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+            <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
+        </HBox>
+    </top>
 
-    <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Bot usage (anonymized)"/>
-    <Label text="Counts per course - individual students are never identified here."
-           style="-fx-text-fill: #666;" wrapText="true"/>
+    <center>
+        <VBox spacing="10" style="-fx-padding: 20;">
+            <Label text="Counts per course - individual students are never identified here."
+                   style="-fx-text-fill: #666;" wrapText="true"/>
 
-    <ListView fx:id="statsListView" prefHeight="360"/>
-    <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh"/>
+            <ListView fx:id="statsListView" prefHeight="360"/>
+            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
 
-    <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
-</VBox>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+        </VBox>
+    </center>
+
+</BorderPane>

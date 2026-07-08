@@ -10,22 +10,21 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.hsts.client.gui.GradingWindow">
+            fx:controller="com.hsts.client.gui.GradingWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
     <top>
-        <VBox spacing="6" style="-fx-padding: 10;">
-            <HBox alignment="CENTER_RIGHT" spacing="8">
-                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
-            </HBox>
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Grade submitted exams"/>
-        </VBox>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+            <Label text="Grade submitted exams" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+            <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+            <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
+        </HBox>
     </top>
 
     <left>
         <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320">
             <ListView fx:id="pendingListView" prefHeight="420"/>
-            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh"/>
+            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
         </VBox>
     </left>
 
@@ -43,10 +42,10 @@
             <Label text="Comment (required if changing the score):"/>
             <TextArea fx:id="commentField" prefHeight="60" wrapText="true"/>
 
-            <Button fx:id="confirmButton" onAction="#handleConfirm" text="Confirm grade"/>
+            <Button fx:id="confirmButton" onAction="#handleConfirm" text="Confirm grade" styleClass="primary-button"/>
 
-            <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
-            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+            <Label fx:id="statusLabel" styleClass="status-success"/>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
         </VBox>
     </center>
 

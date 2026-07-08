@@ -126,7 +126,7 @@ public class LoginWindow {
 
             Stage stage = (Stage) loginButton.getScene().getWindow();
             stage.setTitle("HSTS - Dashboard");
-            stage.setScene(new Scene(root));
+            stage.setScene(new Scene(root, 520, 680));
 
             // FIX: previously nothing ever called controller.logout(), so the
             // server never released the username from its "active sessions"

@@ -10,16 +10,17 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.hsts.client.gui.ExamTakingWindow">
+            fx:controller="com.hsts.client.gui.ExamTakingWindow"
+            styleClass="body-pane" stylesheets="@app.css">
 
     <top>
-        <VBox spacing="6" style="-fx-padding: 10;">
-            <HBox alignment="CENTER_RIGHT" spacing="8">
-                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard"/>
-                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out"/>
+        <VBox>
+            <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+                <Label text="Take an exam" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+                <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
             </HBox>
-            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Take an exam"/>
-            <Label fx:id="timerLabel" style="-fx-font-size: 16px; -fx-text-fill: #a33;"/>
+            <Label fx:id="timerLabel" style="-fx-font-size: 16px; -fx-text-fill: #a33; -fx-padding: 8 0 0 10;"/>
         </VBox>
     </top>
 
@@ -27,7 +28,7 @@
         <VBox spacing="6" style="-fx-padding: 10;" prefWidth="280">
             <Label text="Available exams:"/>
             <ListView fx:id="availableExamsView" prefHeight="360"/>
-            <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam"/>
+            <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam" styleClass="primary-button"/>
         </VBox>
     </left>
 
@@ -36,10 +37,10 @@
             <Label fx:id="instructionsLabel" wrapText="true" style="-fx-font-style: italic;"/>
             <ListView fx:id="questionsView" prefHeight="380"/>
             <HBox spacing="8">
-                <Button fx:id="submitButton" onAction="#handleSubmit" text="Submit exam" disable="true"/>
+                <Button fx:id="submitButton" onAction="#handleSubmit" text="Submit exam" disable="true" styleClass="primary-button"/>
             </HBox>
-            <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
-            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+            <Label fx:id="statusLabel" styleClass="status-success"/>
+            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
         </VBox>
     </center>
 
