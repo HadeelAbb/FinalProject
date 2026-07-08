@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.GradingWindow">
+
+    <top>
+        <Label style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-padding: 10;" text="Grade submitted exams"/>
+    </top>
+
+    <left>
+        <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320">
+            <ListView fx:id="pendingListView" prefHeight="420"/>
+            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh"/>
+        </VBox>
+    </left>
+
+    <center>
+        <VBox spacing="8" style="-fx-padding: 10;">
+            <Label fx:id="detailsLabel" wrapText="true" style="-fx-font-weight: bold;"/>
+            <Label fx:id="autoScoreLabel"/>
+
+            <Label text="Final score (leave as-is to confirm the automatic score):"/>
+            <TextField fx:id="finalScoreField" prefWidth="120"/>
+
+            <Label text="Comment (required if changing the score):"/>
+            <TextArea fx:id="commentField" prefHeight="80" wrapText="true"/>
+
+            <Button fx:id="confirmButton" onAction="#handleConfirm" text="Confirm grade"/>
+
+            <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
+            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+        </VBox>
+    </center>
+
+</BorderPane>
