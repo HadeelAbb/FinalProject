@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.BotChatWindow">
+
+    <top>
+        <VBox spacing="6" style="-fx-padding: 10;">
+            <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Study bot"/>
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label text="Course:"/>
+                <ComboBox fx:id="courseSelector" promptText="Select course"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox spacing="8" style="-fx-padding: 10;">
+            <Label text="Conversation history:"/>
+            <ListView fx:id="historyView" prefHeight="360"/>
+
+            <Label text="Ask a question:"/>
+            <TextArea fx:id="questionField" prefHeight="60" wrapText="true"/>
+            <HBox spacing="8">
+                <Button fx:id="askButton" onAction="#handleAsk" text="Ask"/>
+                <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh history"/>
+            </HBox>
+
+            <Label fx:id="statusLabel" style="-fx-text-fill: #2a6;"/>
+            <Label fx:id="errorLabel" style="-fx-text-fill: red;" wrapText="true"/>
+        </VBox>
+    </center>
+
+</BorderPane>
