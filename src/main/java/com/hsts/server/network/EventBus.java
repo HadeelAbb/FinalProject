@@ -10,16 +10,9 @@ import com.hsts.shared.net.Response;
  * exam/grading/approval logic can publish to, instead of every controller
  * reaching into HSTSServer directly.
  *
- * PARTNER 2 TODO: right now publish() broadcasts to every connected
- * client (same as QUESTIONS_CHANGED does today) regardless of
- * event.getTargetUserId(). To do targeted delivery (e.g. only notify the
- * one teacher whose exam got approved) you'll need a userId -> connection
- * registry, populated on LOGIN and cleared on LOGOUT/disconnect, then
- * filter here: if targetUserId != null, send only to that connection;
- * otherwise broadcast to everyone (or to everyone in that course, once
- * course subscriptions exist). Until then this is functionally correct
- * but noisier than it needs to be - every client gets every event and
- * decides locally whether it's relevant (see ExamEvent fields).
+ * When {@link ExamEvent#getTargetUserId()} is set, the event is delivered
+ * only to that user's connection via {@link ConnectionRegistry}. Otherwise
+ * it is broadcast to every connected client.
  */
 public class EventBus {
 
@@ -30,9 +23,19 @@ public class EventBus {
     }
 
     public void publish(ExamEvent event) {
-        if (server == null || event == null) {
+        if (event == null) {
             return;
         }
-        server.sendToAllClients(Response.success(Command.EXAM_EVENT, event, event.getMessage(), null));
+
+        Response response = Response.success(Command.EXAM_EVENT, event, event.getMessage(), null);
+        String targetUserId = event.getTargetUserId();
+
+        if (targetUserId != null && !targetUserId.isBlank()) {
+            if (server != null) {
+                server.sendToUser(targetUserId, response);
+            }
+        } else if (server != null) {
+            server.sendToAllClients(response);
+        }
     }
 }

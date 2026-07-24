@@ -5,11 +5,13 @@ import com.hsts.shared.net.Request;
 import com.hsts.shared.net.Response;
 
 import java.io.IOException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class HSTSClient extends AbstractClient {
 
     private Consumer<Response> responseHandler;
+    private BiConsumer<ConnectionState, String> connectionStateHandler;
 
     public HSTSClient(String host, int port) {
         super(host, port);
@@ -19,6 +21,14 @@ public class HSTSClient extends AbstractClient {
         this.responseHandler = responseHandler;
     }
 
+    /**
+     * Optional listener for socket lifecycle (open / close / error).
+     * Never used for business command routing.
+     */
+    public void setConnectionStateHandler(BiConsumer<ConnectionState, String> connectionStateHandler) {
+        this.connectionStateHandler = connectionStateHandler;
+    }
+
     public void connectToServer() throws IOException {
         if (!isConnected()) {
             openConnection();
@@ -26,9 +36,9 @@ public class HSTSClient extends AbstractClient {
     }
 
     public void disconnectFromServer() throws IOException {
-        if (isConnected()) {
-            closeConnection();
-        }
+        // Always close: isConnected() can briefly remain true while the
+        // reader thread is exiting after the socket has already been closed.
+        closeConnection();
     }
 
     public void sendRequest(Request request) throws IOException {
@@ -55,23 +65,23 @@ public class HSTSClient extends AbstractClient {
 
     @Override
     protected void connectionEstablished() {
-        if (responseHandler != null) {
-            responseHandler.accept(Response.success(null, null, "Connection established", null));
-        }
+        notifyConnectionState(ConnectionState.OPENED, "Connection established");
     }
 
     @Override
     protected void connectionClosed() {
-        if (responseHandler != null) {
-            responseHandler.accept(Response.success(null, null, "Connection closed", null));
-        }
+        notifyConnectionState(ConnectionState.CLOSED, "Connection closed");
     }
 
     @Override
     protected void connectionException(Exception exception) {
-        if (responseHandler != null) {
-            responseHandler.accept(
-                    Response.failure(null, "Connection exception: " + exception.getMessage(), null));
+        String detail = exception != null ? exception.getMessage() : "unknown error";
+        notifyConnectionState(ConnectionState.ERROR, "Connection exception: " + detail);
+    }
+
+    private void notifyConnectionState(ConnectionState state, String message) {
+        if (connectionStateHandler != null) {
+            connectionStateHandler.accept(state, message);
         }
     }
 }

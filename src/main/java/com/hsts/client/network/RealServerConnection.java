@@ -6,37 +6,40 @@ import com.hsts.shared.net.Request;
 import com.hsts.shared.net.Response;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 
 /**
- * Wraps Partner 2's real com.hsts.client.network.HSTSClient (which extends
- * ocsf.client.AbstractClient) to actually talk to a live HSTSServer over
- * a socket.
+ * Wraps {@link HSTSClient} for live socket communication with HSTSServer.
  *
- * Two things their HSTSClient does differently from how this app was
- * originally wired, both handled here:
- *  1. It only has ONE response handler for all commands, not a per-command
- *     registry - so this class keeps its own Map<Command, ResponseHandler>
- *     and dispatches based on response.getCommand().
- *  2. Responses arrive on OCSF's background socket-reading thread, not the
- *     JavaFX Application Thread - touching any UI control from there will
- *     misbehave or throw, so every handler call is wrapped in
- *     Platform.runLater(...).
+ * Normal request/response correlation uses requestId -> one-time callback.
+ * Persistent listeners (broadcasts / events) are keyed by Command.
+ * Existing controllers keep using {@link #registerHandler} + {@link #sendToServer(Command, Object)};
+ * each send captures the current command handler into a pending requestId entry.
  */
 public class RealServerConnection implements ServerConnection {
 
     private final HSTSClient realClient;
-    private final Map<Command, ResponseHandler> handlers = new HashMap<>();
+    private final ConcurrentHashMap<String, ResponseHandler> pendingRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Command, CopyOnWriteArrayList<ResponseHandler>> eventListeners =
+            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Command, ResponseHandler> commandHandlers = new ConcurrentHashMap<>();
+
+    private BiConsumer<ConnectionState, String> connectionStateHandler;
+    private volatile boolean connectionLossNotified;
 
     public RealServerConnection(String host, int port) {
         this.realClient = new HSTSClient(host, port);
         this.realClient.setResponseHandler(this::dispatch);
+        this.realClient.setConnectionStateHandler(this::onConnectionState);
     }
 
     /** Call once at startup, before sending anything. Throws if the server isn't reachable. */
     public void connect() throws IOException {
+        connectionLossNotified = false;
         realClient.connectToServer();
     }
 
@@ -44,34 +47,122 @@ public class RealServerConnection implements ServerConnection {
         realClient.disconnectFromServer();
     }
 
-    @Override
-    public void registerHandler(Command command, ResponseHandler handler) {
-        handlers.put(command, handler);
+    public boolean isConnected() {
+        return realClient.isConnected();
+    }
+
+    /**
+     * Optional socket lifecycle listener. Invoked on the JavaFX thread when available.
+     * Duplicate CLOSED/ERROR notifications for the same loss are suppressed.
+     */
+    public void setConnectionStateHandler(BiConsumer<ConnectionState, String> connectionStateHandler) {
+        this.connectionStateHandler = connectionStateHandler;
     }
 
     @Override
+    public void registerHandler(Command command, ResponseHandler handler) {
+        if (command == null || handler == null) {
+            return;
+        }
+        ResponseHandler previous = commandHandlers.put(command, handler);
+        CopyOnWriteArrayList<ResponseHandler> listeners =
+                eventListeners.computeIfAbsent(command, ignored -> new CopyOnWriteArrayList<>());
+        if (previous != null) {
+            listeners.remove(previous);
+        }
+        if (!listeners.contains(handler)) {
+            listeners.add(handler);
+        }
+    }
+
+    /**
+     * Backward-compatible send: captures the currently registered command handler
+     * as a one-time pending callback keyed by the request's requestId.
+     */
+    @Override
     public void sendToServer(Command command, Object payload) {
+        sendToServer(command, payload, commandHandlers.get(command));
+    }
+
+    /**
+     * Request/response send with an explicit one-time callback correlated by requestId.
+     */
+    public void sendToServer(Command command, Object payload, ResponseHandler responseHandler) {
+        String requestId = UUID.randomUUID().toString();
+        if (responseHandler != null) {
+            pendingRequests.put(requestId, responseHandler);
+        }
+
         try {
-            realClient.sendRequest(new Request(command, payload, UUID.randomUUID().toString()));
+            realClient.sendRequest(new Request(command, payload, requestId));
         } catch (IOException e) {
-            ResponseHandler handler = handlers.get(command);
-            if (handler != null) {
-                Platform.runLater(() -> handler.handleResponse(
-                        Response.failure(command, "Could not reach server: " + e.getMessage(), null)));
+            pendingRequests.remove(requestId);
+            if (responseHandler != null) {
+                runOnFxThread(() -> responseHandler.handleResponse(
+                        Response.failure(command, "Could not reach server: " + e.getMessage(), requestId)));
             }
         }
     }
 
     private void dispatch(Response response) {
-        // connectionEstablished()/connectionClosed()/connectionException() in
-        // their HSTSClient send Responses with command == null - not meant
-        // for any ClientController, just informational.
+        if (response == null) {
+            return;
+        }
+
+        // Business responses only. Connection lifecycle uses ConnectionState.
         if (response.getCommand() == null) {
             return;
         }
-        ResponseHandler handler = handlers.get(response.getCommand());
-        if (handler != null) {
-            Platform.runLater(() -> handler.handleResponse(response));
+
+        String requestId = response.getRequestId();
+        if (requestId != null && !requestId.isBlank()) {
+            ResponseHandler pending = pendingRequests.remove(requestId);
+            if (pending != null) {
+                runOnFxThread(() -> pending.handleResponse(response));
+                return;
+            }
+        }
+
+        // Broadcasts / events (or unmatched responses): notify persistent listeners.
+        List<ResponseHandler> listeners = eventListeners.get(response.getCommand());
+        if (listeners != null) {
+            for (ResponseHandler listener : listeners) {
+                runOnFxThread(() -> listener.handleResponse(response));
+            }
+        }
+    }
+
+    private void onConnectionState(ConnectionState state, String message) {
+        if (state == ConnectionState.OPENED) {
+            connectionLossNotified = false;
+        } else if (state == ConnectionState.CLOSED || state == ConnectionState.ERROR) {
+            if (connectionLossNotified) {
+                return;
+            }
+            connectionLossNotified = true;
+        }
+
+        BiConsumer<ConnectionState, String> handler = connectionStateHandler;
+        if (handler == null) {
+            return;
+        }
+
+        runOnFxThread(() -> handler.accept(state, message));
+    }
+
+    /**
+     * UI callbacks must run on the JavaFX thread. If the toolkit is not running
+     * (unit tests), invoke directly so networking tests remain usable.
+     */
+    private void runOnFxThread(Runnable action) {
+        try {
+            if (Platform.isFxApplicationThread()) {
+                action.run();
+            } else {
+                Platform.runLater(action);
+            }
+        } catch (IllegalStateException ignored) {
+            action.run();
         }
     }
 }
