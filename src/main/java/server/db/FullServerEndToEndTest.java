@@ -76,18 +76,32 @@ public class FullServerEndToEndTest extends AbstractClient {
                 }
 
                 // -------------------------------------------------------------
-                // TEST 3: Submit Exam Attempt (Student Auto-Grading)
+                // TEST 3: Submit First Exam Attempt (Student Auto-Grading)
                 // -------------------------------------------------------------
-                System.out.println("\n--- 3. Testing SUBMIT_EXAM ---");
+                System.out.println("\n--- 3. Testing SUBMIT_EXAM (First Attempt) ---");
                 SubmitExamData submitData = new SubmitExamData(
-                        examId, "admin", Map.of("11001", "O(log n)", "11002", "Stack"), false
+                        examId, "student1", Map.of("11001", "O(log n)", "11002", "Stack"), false
                 );
                 Request submitReq = new Request(Command.SUBMIT_EXAM, submitData, "test-req-3");
                 Response submitResp = testClient.sendRequestSync(submitReq);
 
                 if (submitResp.isSuccess() && submitResp.getPayload() instanceof ExamAnswer answer) {
-                    System.out.println("✓ Success! Answer recorded with ID: " + answer.getExamAnswerId());
+                    System.out.println("✓ Success! First answer recorded with ID: " + answer.getExamAnswerId());
                     System.out.println("  Auto-graded Score: " + answer.getAutoScore() + "%");
+
+                    // -------------------------------------------------------------
+                    // TEST 3.5: Duplicate Exam Submission (Should Fail!)
+                    // -------------------------------------------------------------
+                    System.out.println("\n--- 3.5. Testing SUBMIT_EXAM (Duplicate Attempt Check) ---");
+                    Request duplicateReq = new Request(Command.SUBMIT_EXAM, submitData, "test-req-3-dup");
+                    Response duplicateResp = testClient.sendRequestSync(duplicateReq);
+
+                    if (!duplicateResp.isSuccess()) {
+                        System.out.println("✓ Success! Duplicate submission correctly blocked by server.");
+                        System.out.println("  Server Response Message: " + duplicateResp.getMessage());
+                    } else {
+                        System.err.println("❌ Failed Duplicate Check: Server allowed a second submission for the same student!");
+                    }
 
                     // -------------------------------------------------------------
                     // TEST 4: Teacher Grade Confirmation
@@ -141,13 +155,11 @@ public class FullServerEndToEndTest extends AbstractClient {
                     null, "student1", "11", "How do I format a binary tree?", ""
             );
 
-            // Fixed: Uses Command.ASK_BOT_QUESTION
             Request botReq = new Request(Command.ASK_BOT_QUESTION, botReqData, "test-bot-1");
             Response botResp = testClient.sendRequestSync(botReq);
 
             if (botResp.isSuccess() && botResp.getPayload() instanceof BotInteraction savedBot) {
                 System.out.println("✓ Success! Bot responded and saved interaction ID: " + savedBot.getInteractionId());
-                // Fixed: Uses getAnswer() instead of getBotResponse()
                 System.out.println("  Response text: " + savedBot.getAnswer());
             } else {
                 System.err.println("❌ Failed ASK_BOT_QUESTION: " + botResp.getMessage());

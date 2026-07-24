@@ -82,24 +82,44 @@ public class ExamServerController {
         if (optExam.isEmpty()) return null;
 
         Exam exam = optExam.get();
+
+        // 1. Check if student has already submitted this exam (Enforce 1 attempt per student)
+        if (hasStudentAlreadySubmitted(data.getStudentId(), data.getExamId())) {
+            System.err.println("Submission rejected: Student " + data.getStudentId() + " has already taken exam " + data.getExamId());
+            return null;
+        }
+
+        // 2. Optional: Verify exam is currently active/open for submission
+        LocalDateTime now = LocalDateTime.now();
+        if (exam.getScheduledStart() != null && now.isBefore(exam.getScheduledStart())) {
+            System.err.println("Submission rejected: Exam has not started yet.");
+            return null;
+        }
+        if (exam.getScheduledEnd() != null && now.isAfter(exam.getScheduledEnd())) {
+            System.err.println("Submission rejected: Exam window has expired.");
+            return null;
+        }
+
         double earnedPoints = 0.0;
-        int totalQuestions = exam.getQuestions().size();
+        int totalQuestions = exam.getQuestions() != null ? exam.getQuestions().size() : 0;
         double pointsPerQuestion = totalQuestions > 0 ? (100.0 / totalQuestions) : 0.0;
 
         // Auto-grading routine
-        for (Question q : exam.getQuestions()) {
-            String studentSelected = data.getSelectedAnswers().get(q.getQuestionId());
-            String correctAnswer = fetchCorrectAnswerForQuestion(q.getQuestionId());
+        if (exam.getQuestions() != null && data.getSelectedAnswers() != null) {
+            for (Question q : exam.getQuestions()) {
+                String studentSelected = data.getSelectedAnswers().get(q.getQuestionId());
+                String correctAnswer = fetchCorrectAnswerForQuestion(q.getQuestionId());
 
-            if (studentSelected != null && studentSelected.trim().equalsIgnoreCase(correctAnswer != null ? correctAnswer.trim() : "")) {
-                earnedPoints += pointsPerQuestion;
+                if (studentSelected != null && studentSelected.trim().equalsIgnoreCase(correctAnswer != null ? correctAnswer.trim() : "")) {
+                    earnedPoints += pointsPerQuestion;
+                }
             }
         }
 
         String newAnswerId = "EA" + (System.currentTimeMillis() % 100000);
         ExamAnswer answer = new ExamAnswer(newAnswerId, data.getExamId(), data.getStudentId());
         answer.setSelectedAnswers(data.getSelectedAnswers());
-        answer.setSubmittedAt(LocalDateTime.now());
+        answer.setSubmittedAt(now);
         answer.setAutoSubmitted(data.isAutoSubmitted());
         answer.setAutoScore(earnedPoints);
         answer.setFinalScore(earnedPoints); // Default until overridden by teacher
@@ -122,6 +142,25 @@ public class ExamServerController {
     }
 
     // Helpers
+    private boolean hasStudentAlreadySubmitted(String studentId, String examId) {
+        String sql = "SELECT COUNT(*) FROM exam_answers WHERE student_id = ? AND exam_id = ?";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return false;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, studentId);
+            stmt.setString(2, examId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     private List<Question> fetchQuestionsByIds(List<String> ids) {
         List<Question> list = new ArrayList<>();
         if (ids == null || ids.isEmpty()) return list;
@@ -129,6 +168,7 @@ public class ExamServerController {
         String sql = "SELECT q.*, c.name as course_name FROM questions q " +
                 "LEFT JOIN courses c ON q.course_id = c.course_id WHERE q.question_id = ?";
         Connection conn = dbManager.getConnection();
+        if (conn == null) return list;
 
         for (String qId : ids) {
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
