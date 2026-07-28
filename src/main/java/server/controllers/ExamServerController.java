@@ -158,6 +158,37 @@ public class ExamServerController {
 
         return answerRepository.save(answer) ? answer : null;
     }
+    // SUC-6: Retrieve Approved Exam Directly by 4-Character Execution Code
+    public Exam getExamByExecutionCode(String executionCode) {
+        if (executionCode == null || executionCode.trim().length() != 4) {
+            System.err.println("[EXAM-SERVER] Invalid execution code format.");
+            return null;
+        }
+
+        String sql = "SELECT exam_id FROM exams WHERE LOWER(execution_code) = LOWER(?) AND status = 'APPROVED'";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return null;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, executionCode.trim());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String examId = rs.getString("exam_id");
+                    Optional<Exam> optExam = examRepository.findById(examId);
+                    if (optExam.isPresent()) {
+                        System.out.println("[EXAM-SERVER] Successfully fetched exam [" + examId + "] via code: " + executionCode);
+                        return optExam.get();
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[EXAM-SERVER ERROR] Failed to fetch exam by execution code: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        System.err.println("[EXAM-SERVER] No approved exam found for execution code: " + executionCode);
+        return null;
+    }
 
     // SUC-7: Teacher Grade Confirmation / Score Override
     public boolean confirmGrade(ConfirmGradeData data) {
