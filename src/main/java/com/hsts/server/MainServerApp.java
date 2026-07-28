@@ -105,8 +105,6 @@ public class MainServerApp {
                 return Response.failure(Command.LOGIN, "Invalid username or password", request.getRequestId());
             }
 
-            // Important: duplicate login is not a wrong-password error.
-            // This lets the client show: "User is already active in a session."
             if (loginServerController.isAlreadyLoggedIn(username)) {
                 return Response.failure(
                         Command.LOGIN,
@@ -120,22 +118,88 @@ public class MainServerApp {
                 return Response.failure(Command.LOGIN, "Invalid username or password", request.getRequestId());
             }
 
-            Teacher teacherProfile = buildAuthenticatedTeacherProfile(username);
-            teacherProfile.setCourses(loadCoursesFromDatabase());
+            // FETCH DYNAMIC USER PROFILE FROM DATABASE BASED ON ROLE
+            User authenticatedUser = buildAuthenticatedUserProfile(username);
+
+            if (authenticatedUser == null) {
+                return Response.failure(Command.LOGIN, "User profile not found in database.", request.getRequestId());
+            }
 
             return Response.success(
                     Command.LOGIN,
-                    teacherProfile,
+                    authenticatedUser,
                     "Database authentication success.",
                     request.getRequestId()
             );
         });
 
-        // The real LOGOUT cleanup is handled in configureSessionHandling(...)
-        // so the username is resolved from the connection safely and the registry is cleaned.
         router.registerHandler(Command.LOGOUT, request ->
                 Response.success(Command.LOGOUT, null, "Logged out successfully.", request.getRequestId())
         );
+    }
+
+    // 🛠️ DYNAMIC USER FACTORY BASED ON MYSQL ROLE
+    private static User buildAuthenticatedUserProfile(String username) {
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        if (conn == null) return null;
+
+        String sql = "SELECT * FROM users WHERE username = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, username);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    // Try reading role, falling back to TEACHER if column/data is missing
+                    String role = "";
+                    try {
+                        role = rs.getString("role");
+                    } catch (Exception e) {
+                        role = "TEACHER";
+                    }
+
+                    // Try reading name details safely
+                    String firstName = "User";
+                    String lastName = username;
+                    try {
+                        if (rs.getString("first_name") != null) firstName = rs.getString("first_name");
+                        if (rs.getString("last_name") != null) lastName = rs.getString("last_name");
+                    } catch (Exception ignored) {}
+
+                    if ("STUDENT".equalsIgnoreCase(role)) {
+                        com.hsts.shared.model.Student student = new com.hsts.shared.model.Student();
+                        student.setId(username);
+                        student.setFirstName(firstName);
+                        student.setLastName(lastName);
+                        student.setRole("STUDENT");
+                        return student;
+                    } else if ("COORDINATOR".equalsIgnoreCase(role) || "SUBJECT_COORDINATOR".equalsIgnoreCase(role)) {
+                        com.hsts.shared.model.SubjectCoordinator coord = new com.hsts.shared.model.SubjectCoordinator();
+                        coord.setId(username);
+                        coord.setFirstName(firstName);
+                        coord.setLastName(lastName);
+                        coord.setRole("SUBJECT_COORDINATOR");
+                        return coord;
+                    } else {
+                        Teacher teacher = new Teacher();
+                        teacher.setId(username);
+                        teacher.setFirstName(firstName);
+                        teacher.setLastName(lastName);
+                        teacher.setRole("TEACHER");
+                        teacher.setCourses(loadCoursesFromDatabase());
+                        return teacher;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[SERVER-ERROR] Failed to fetch user profile: " + e.getMessage());
+        }
+
+        // Fallback if user is authenticated by LoginServerController but missing from SELECT *
+        com.hsts.shared.model.Student fallbackStudent = new com.hsts.shared.model.Student();
+        fallbackStudent.setId(username);
+        fallbackStudent.setFirstName(username);
+        fallbackStudent.setLastName("");
+        fallbackStudent.setRole("STUDENT");
+        return fallbackStudent;
     }
 
     private static Teacher buildAuthenticatedTeacherProfile(String username) {

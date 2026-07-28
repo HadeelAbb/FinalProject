@@ -1,111 +1,169 @@
 package server.db;
 
 import com.hsts.shared.model.*;
+import com.hsts.shared.net.dto.StartExamData;
+import server.controllers.ExamServerController;
 import server.db.repository.ExamAnswerRepositoryImpl;
 import server.db.repository.ExamRepositoryImpl;
 
-import java.time.LocalDateTime;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.List;
 
 public class RepositoryTestDriver {
 
     public static void main(String[] args) {
-        System.out.println("=== STARTING REPOSITORY & DB INTEGRATION TEST ===");
+        System.out.println("=== VERIFYING BACKEND REPOSITORIES & CONTROLLERS (CHUNKS 1 & 2) ===");
 
-        // 1. Connect to MySQL Database
         DatabaseManager dbManager = DatabaseManager.getInstance();
         if (!dbManager.connect()) {
-            System.err.println(">>> FATAL: Database connection failed. Aborting test.");
+            System.err.println(">>> FATAL: Database connection failed. Is MySQL running?");
             return;
         }
 
         ExamRepositoryImpl examRepo = new ExamRepositoryImpl();
         ExamAnswerRepositoryImpl answerRepo = new ExamAnswerRepositoryImpl();
+        ExamServerController examController = new ExamServerController();
+
+        // 0. Pre-Cleanup: Ensure clean state before starting
+        cleanupTestData(examRepo, answerRepo);
+
+        // 1. Ensure test users exist in DB to satisfy foreign keys
+        ensureTestStudentsExist();
 
         try {
             // -------------------------------------------------------------
-            // TEST 1: Create and Save a Test Exam
+            // TEST 1: Save Exam with Execution Code "A1B2"
             // -------------------------------------------------------------
-            System.out.println("\n--- TEST 1: Saving a Test Exam ---");
-
-            // Build dummy question using seeded question ID "11001" from your DB
-            Question testQuestion = new Question();
-            testQuestion.setQuestionId("11001");
-
+            System.out.println("\n--- TEST 1: Saving Exam with Execution Code 'A1B2' ---");
             Exam testExam = new Exam("E100", "11", "Midterm Exam 2026",
-                    "Answer all questions carefully.", List.of(testQuestion), 60, "teacher1");
-            testExam.setStatus(ExamStatus.DRAFT);
+                    "Answer all questions.", List.of(), 60, "teacher1");
+            testExam.setStatus(ExamStatus.APPROVED);
+            testExam.setExecutionCode("A1B2");
 
             boolean savedExam = examRepo.save(testExam);
-            System.out.println("Exam saved to MySQL: " + savedExam);
+            check(savedExam, "Exam E100 saved to MySQL successfully");
 
             // -------------------------------------------------------------
-            // TEST 2: Retrieve Exam by ID from Database
+            // TEST 2: Read Execution Code Back from Database
             // -------------------------------------------------------------
-            System.out.println("\n--- TEST 2: Reading Exam 'E100' back from DB ---");
+            System.out.println("\n--- TEST 2: Reading 'E100' Back from MySQL ---");
             examRepo.findById("E100").ifPresentOrElse(
                     exam -> {
-                        System.out.println("✓ Found Exam: " + exam.getTitle() + " | Status: " + exam.getStatus());
-                        System.out.println("  Linked Questions Count: " + exam.getQuestions().size());
+                        boolean codeMatches = "A1B2".equalsIgnoreCase(exam.getExecutionCode());
+                        check(codeMatches, "Execution code read back correctly from DB: " + exam.getExecutionCode());
                     },
-                    () -> System.err.println("❌ Failed to find exam 'E100'!")
+                    () -> check(false, "Failed to retrieve exam E100 from DB")
             );
 
             // -------------------------------------------------------------
-            // TEST 3: Update Exam Status (Approval Simulation)
+            // TEST 3: Validate Start Exam with Valid vs Invalid Code
             // -------------------------------------------------------------
-            System.out.println("\n--- TEST 3: Updating Exam Status to APPROVED ---");
-            testExam.setStatus(ExamStatus.APPROVED);
-            testExam.setApprovedByCoordinatorId("coord1");
-            boolean updatedExam = examRepo.update(testExam);
-            System.out.println("Exam update status: " + updatedExam);
+            System.out.println("\n--- TEST 3: Verifying Execution Code Enforcement in Controller ---");
+            StartExamData startData = new StartExamData("E100", "test_s1");
+
+            Exam wrongResult = examController.startExam(startData, "WRNG");
+            check(wrongResult == null, "Start rejected for invalid code 'WRNG'");
+
+            Exam correctResult = examController.startExam(startData, "A1B2");
+            check(correctResult != null, "Start approved for valid code 'A1B2'");
 
             // -------------------------------------------------------------
-            // TEST 4: Record Student Exam Submission
+            // TEST 4: Auto-Generate Code on Approval
             // -------------------------------------------------------------
-            System.out.println("\n--- TEST 4: Saving Student Submission ---");
-            // Uses student username 'admin' or any valid user in your users table
-            ExamAnswer studentAttempt = new ExamAnswer("EA100", "E100", "admin");
-            studentAttempt.setStartedAt(LocalDateTime.now().minusMinutes(30));
-            studentAttempt.setSubmittedAt(LocalDateTime.now());
-            studentAttempt.setAutoScore(85.0);
-            studentAttempt.getSelectedAnswers().put("11001", "O(log n)");
+            System.out.println("\n--- TEST 4: Testing Automatic Code Generation on Approval ---");
+            Exam draftExam = new Exam("E200", "11", "Quiz 2026",
+                    "Quick quiz.", List.of(), 15, "teacher1");
+            draftExam.setStatus(ExamStatus.DRAFT);
+            examRepo.save(draftExam);
 
-            boolean savedAnswer = answerRepo.save(studentAttempt);
-            System.out.println("Student Answer saved: " + savedAnswer);
+            Exam approvedExam = examController.approveExam("E200", "coord1");
+            boolean autoGenerated = approvedExam != null
+                    && approvedExam.getExecutionCode() != null
+                    && approvedExam.getExecutionCode().length() == 4;
+            check(autoGenerated, "4-character code auto-generated on approval: "
+                    + (approvedExam != null ? approvedExam.getExecutionCode() : "null"));
 
             // -------------------------------------------------------------
-            // TEST 5: Update Grade & Confirm
+            // TEST 5: CHUNK 2 - Statistical Engine (Mean, Median, Deciles)
             // -------------------------------------------------------------
-            System.out.println("\n--- TEST 5: Confirming Grade ---");
-            studentAttempt.setFinalScore(90.0);
-            studentAttempt.setTeacherComment("Great work on question 1!");
-            studentAttempt.setGradeConfirmed(true);
-            boolean updatedAnswer = answerRepo.update(studentAttempt);
-            System.out.println("Grade update confirmed: " + updatedAnswer);
+            System.out.println("\n--- TEST 5: Testing Statistical Calculation Engine ---");
+            ExamAnswer a1 = new ExamAnswer("EA1", "E100", "test_s1");
+            a1.setAutoScore(75.0); a1.setFinalScore(75.0); a1.setGradeConfirmed(true);
+            answerRepo.save(a1);
 
-            // Read answer back
-            answerRepo.findById("EA100").ifPresent(ans ->
-                    System.out.println("✓ Read back Answer EA100: Final Score = " + ans.getFinalScore()
-                            + " | Comment = " + ans.getTeacherComment())
+            ExamAnswer a2 = new ExamAnswer("EA2", "E100", "test_s2");
+            a2.setAutoScore(85.0); a2.setFinalScore(85.0); a2.setGradeConfirmed(true);
+            answerRepo.save(a2);
+
+            ExamAnswer a3 = new ExamAnswer("EA3", "E100", "test_s3");
+            a3.setAutoScore(95.0); a3.setFinalScore(95.0); a3.setGradeConfirmed(true);
+            answerRepo.save(a3);
+
+            answerRepo.getExamStats("E100").ifPresentOrElse(
+                    stats -> {
+                        check(stats.getMean() == 85.0, "Calculated Mean is 85.0 (got " + stats.getMean() + ")");
+                        check(stats.getMedian() == 85.0, "Calculated Median is 85.0 (got " + stats.getMedian() + ")");
+                        check(stats.getTotalSubmissions() == 3, "Total Submissions is 3");
+                    },
+                    () -> check(false, "Failed to calculate stats for E100")
             );
-
-            // -------------------------------------------------------------
-            // CLEANUP: Delete test records
-            // -------------------------------------------------------------
-            System.out.println("\n--- CLEANUP: Removing Test Data ---");
-            boolean deletedAnswer = answerRepo.deleteById("EA100");
-            boolean deletedExam = examRepo.deleteById("E100");
-            System.out.println("Deleted test answer EA100: " + deletedAnswer);
-            System.out.println("Deleted test exam E100: " + deletedExam);
-
-            System.out.println("\n=== ALL REPOSITORY TESTS PASSED SUCCESSFULLY! ===");
 
         } catch (Exception e) {
             System.err.println("❌ TEST FAILED WITH EXCEPTION:");
             e.printStackTrace();
         } finally {
+            // -------------------------------------------------------------
+            // CLEANUP: Delete Test Records & Test Users
+            // -------------------------------------------------------------
+            System.out.println("\n--- CLEANUP: Removing Test Data ---");
+            cleanupTestData(examRepo, answerRepo);
+            removeTestStudents();
+            System.out.println("Cleanup completed successfully.");
+
             dbManager.disconnect();
+        }
+    }
+
+    private static void ensureTestStudentsExist() {
+        String sql = "INSERT IGNORE INTO users (username, password, role) VALUES " +
+                "('test_s1', '1234', 'STUDENT'), " +
+                "('test_s2', '1234', 'STUDENT'), " +
+                "('test_s3', '1234', 'STUDENT')";
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        if (conn != null) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private static void removeTestStudents() {
+        String sql = "DELETE FROM users WHERE username IN ('test_s1', 'test_s2', 'test_s3')";
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        if (conn != null) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.executeUpdate();
+            } catch (SQLException ignored) {}
+        }
+    }
+
+    private static void cleanupTestData(ExamRepositoryImpl examRepo, ExamAnswerRepositoryImpl answerRepo) {
+        answerRepo.deleteById("EA1");
+        answerRepo.deleteById("EA2");
+        answerRepo.deleteById("EA3");
+        examRepo.deleteById("E100");
+        examRepo.deleteById("E200");
+    }
+
+    private static void check(boolean condition, String description) {
+        if (condition) {
+            System.out.println("  ✓ PASS: " + description);
+        } else {
+            System.out.println("  ❌ FAIL: " + description);
         }
     }
 }

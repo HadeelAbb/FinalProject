@@ -24,6 +24,7 @@ public class Exam implements Serializable {
     private String rejectionReason;
     private LocalDateTime scheduledStart;
     private LocalDateTime scheduledEnd;
+    private String executionCode;
 
     public Exam() {
     }
@@ -37,6 +38,12 @@ public class Exam implements Serializable {
         this.questions = questions != null ? questions : new ArrayList<>();
         this.durationMinutes = durationMinutes;
         this.createdByTeacherId = createdByTeacherId;
+    }
+    // Overloaded constructor supporting executionCode
+    public Exam(String examId, String courseId, String title, String instructionsForStudents,
+                List<Question> questions, int durationMinutes, String createdByTeacherId, String executionCode) {
+        this(examId, courseId, title, instructionsForStudents, questions, durationMinutes, createdByTeacherId);
+        this.executionCode = executionCode;
     }
 
     public int totalPoints() {
@@ -147,4 +154,14 @@ public class Exam implements Serializable {
     public String toString() {
         return "[" + examId + "] " + title + " (" + status + ")";
     }
+
+
+    public String getExecutionCode() {
+        return executionCode;
+    }
+
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
+    }
+
 }

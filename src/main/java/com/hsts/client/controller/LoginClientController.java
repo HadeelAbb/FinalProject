@@ -19,6 +19,7 @@ public class LoginClientController implements ResponseHandler {
     public LoginClientController(ServerConnection client) {
         this.client = client;
         client.registerHandler(Command.LOGIN, this);
+        client.registerHandler(Command.LOGOUT, this); //handling logout command
     }
 
     public void setView(LoginWindow view) {
@@ -46,11 +47,18 @@ public class LoginClientController implements ResponseHandler {
             client.sendToServer(Command.LOGOUT, new LogoutData(currentUser.getId()));
         }
         currentUser = null;
+        this.lastAttemptedUsername = null;
     }
 
     @Override
     public void handleResponse(Response response) {
-        handleLoginResponse(response);
+        if (response.getCommand() == Command.LOGOUT) {
+            // Clear local reference on server confirmation
+            this.currentUser = null;
+        } else {
+            handleLoginResponse(response);
+        }
+
     }
 
     public void handleLoginResponse(Response response) {

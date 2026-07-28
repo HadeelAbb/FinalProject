@@ -6,6 +6,8 @@ import server.db.DatabaseManager;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public class ExamRepositoryImpl implements Repository<Exam, String> {
@@ -56,7 +58,7 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
     @Override
     public boolean save(Exam exam) {
         String sqlExam = "INSERT INTO exams (exam_id, course_id, title, instructions, duration_minutes, " +
-                "status, created_by_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                "status, created_by_teacher_id, execution_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         String sqlQuestions = "INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES (?, ?, ?)";
 
         Connection conn = dbManager.getConnection();
@@ -73,6 +75,7 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
                 stmt.setInt(5, exam.getDurationMinutes());
                 stmt.setString(6, exam.getStatus().name());
                 stmt.setString(7, exam.getCreatedByTeacherId());
+                stmt.setString(8, exam.getExecutionCode());
                 stmt.executeUpdate();
             }
 
@@ -101,7 +104,7 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
     @Override
     public boolean update(Exam exam) {
         String sql = "UPDATE exams SET status = ?, approved_by_coordinator_id = ?, rejection_reason = ?, " +
-                "duration_minutes = ?, scheduled_start = ?, scheduled_end = ? WHERE exam_id = ?";
+                "duration_minutes = ?, scheduled_start = ?, scheduled_end = ?, execution_code = ? WHERE exam_id = ?";
         Connection conn = dbManager.getConnection();
         if (conn == null) return false;
 
@@ -112,7 +115,8 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
             stmt.setInt(4, exam.getDurationMinutes());
             stmt.setTimestamp(5, exam.getScheduledStart() != null ? Timestamp.valueOf(exam.getScheduledStart()) : null);
             stmt.setTimestamp(6, exam.getScheduledEnd() != null ? Timestamp.valueOf(exam.getScheduledEnd()) : null);
-            stmt.setString(7, exam.getExamId());
+            stmt.setString(7, exam.getExecutionCode());
+            stmt.setString(8, exam.getExamId());
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -146,6 +150,18 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
         exam.setCreatedByTeacherId(rs.getString("created_by_teacher_id"));
         exam.setApprovedByCoordinatorId(rs.getString("approved_by_coordinator_id"));
         exam.setRejectionReason(rs.getString("rejection_reason"));
+        exam.setExecutionCode(rs.getString("execution_code"));
+
+        Timestamp startTs = rs.getTimestamp("scheduled_start");
+        if (startTs != null) {
+            exam.setScheduledStart(startTs.toLocalDateTime());
+        }
+
+        Timestamp endTs = rs.getTimestamp("scheduled_end");
+        if (endTs != null) {
+            exam.setScheduledEnd(endTs.toLocalDateTime());
+        }
+
         return exam;
     }
 

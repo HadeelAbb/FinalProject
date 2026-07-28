@@ -1,12 +1,15 @@
 package server.db.repository;
 
 import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.model.ExamStats;
 import server.db.DatabaseManager;
 
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ExamAnswerRepositoryImpl {
 
@@ -30,8 +33,8 @@ public class ExamAnswerRepositoryImpl {
                 stmt.setString(3, answer.getStudentId());
                 stmt.setTimestamp(4, answer.getSubmittedAt() != null ? Timestamp.valueOf(answer.getSubmittedAt()) : Timestamp.valueOf(java.time.LocalDateTime.now()));
                 stmt.setBoolean(5, answer.isAutoSubmitted());
-                stmt.setDouble(6, answer.getAutoScore());
-                stmt.setDouble(7, answer.getFinalScore());
+                stmt.setDouble(6, answer.getAutoScore() != null ? answer.getAutoScore() : 0.0);
+                stmt.setDouble(7, answer.getFinalScore() != null ? answer.getFinalScore() : 0.0);
                 stmt.setBoolean(8, answer.isGradeConfirmed());
 
                 stmt.executeUpdate();
@@ -152,5 +155,57 @@ public class ExamAnswerRepositoryImpl {
             e.printStackTrace();
             return false;
         }
+    }
+    /**
+     * Chunk 2: Computes Mean, Median, and Decile Distribution for confirmed scores of an exam.
+     */
+    public Optional<ExamStats> getExamStats(String examId) {
+        String sql = "SELECT final_score FROM exam_answers WHERE exam_id = ? AND grade_confirmed = 1 ORDER BY final_score ASC";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return Optional.empty();
+
+        List<Double> scores = new ArrayList<>();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, examId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    scores.add(rs.getDouble("final_score"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Optional.empty();
+        }
+
+        if (scores.isEmpty()) {
+            return Optional.empty(); // No confirmed grades available yet
+        }
+
+        int total = scores.size();
+
+        // 1. Calculate Mean
+        double sum = 0;
+        for (double s : scores) sum += s;
+        double mean = Math.round((sum / total) * 100.0) / 100.0;
+
+        // 2. Calculate Median
+        double median;
+        if (total % 2 == 1) {
+            median = scores.get(total / 2);
+        } else {
+            median = (scores.get((total / 2) - 1) + scores.get(total / 2)) / 2.0;
+        }
+        median = Math.round(median * 100.0) / 100.0;
+
+        // 3. Calculate Decile Distribution (0-9, 10-19, ..., 90-100)
+        int[] deciles = new int[10];
+        for (double score : scores) {
+            int index = (int) (score / 10.0);
+            if (index >= 10) index = 9; // Handle score == 100.0
+            if (index < 0) index = 0;
+            deciles[index]++;
+        }
+
+        return Optional.of(new ExamStats(examId, total, mean, median, deciles));
     }
 }

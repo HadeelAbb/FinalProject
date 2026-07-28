@@ -13,5 +13,7 @@ public enum ExamStatus implements Serializable {
     DRAFT,
     PENDING_APPROVAL,
     APPROVED,
-    REJECTED
+    REJECTED,
+    IN_PROGRESS,
+    DONE
 }
