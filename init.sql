@@ -1,175 +1,199 @@
--- Disable foreign key checks during schema creation
-SET FOREIGN_KEY_CHECKS = 0;
+-- ============================================================================
+-- High School Test System (HSTS) - Database Initialization Script
+-- Module Version: Assignment 3 (Spring 2026)
+-- Domain: Database Schema, Repositories, and Business Logic Integration
+-- ============================================================================
+-- OVERVIEW:
+-- This script builds the relational database schema for the HSTS backend and
+-- populates it with initial seed data required for integration testing.
+--
+-- SCHEMA TABLES:
+-- 1. users                   - User accounts and roles (STUDENT, TEACHER, COORDINATOR, PRINCIPAL)
+-- 2. courses                 - Subject courses (CS101, MATH201)
+-- 3. questions               - Bank of questions classified by difficulty, topic, and course
+-- 4. question_answers        - Multiple-choice options with correctness flags
+-- 5. exams                   - Exam drafts and approved exams with 4-character execution codes
+-- 6. exam_questions          - Join table linking questions to specific exams with order
+-- 7. exam_answers            - Student exam submissions and automated/manual scores
+-- 8. student_selected_answers - Individual student answers per submitted exam attempt
+--
+-- SEEDED TEST USERS & CREDENTIALS:
+-- • Student:     username = 'student1'     | password = '123456' | role = STUDENT
+-- • Teacher:     username = 'teacher1'     | password = '123456' | role = TEACHER
+-- • Coordinator: username = 'coord1'       | password = '123456' | role = COORDINATOR
+-- • Principal:   username = 'principal1'   | password = '123456' | role = PRINCIPAL
+--
+-- SEEDED COURSE & EXAM DATA:
+-- • Courses: CS101 (Computer Science Fundamentals), MATH201 (Linear Algebra & Calculus)
+-- • Questions: 5 pre-loaded CS101 questions across Architecture, Data Structures, Concurrency, etc.
+-- • Active Exam: Exam E72874 (Code: HKD6) linked to all 5 questions, approved and scheduled
+-- ============================================================================
+CREATE DATABASE IF NOT EXISTS hsts_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE hsts_db;
 
-CREATE DATABASE IF NOT EXISTS `hsts_db`
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_0900_ai_ci;
+-- --------------------------------------------------------
+-- Drop Tables in Reverse Dependency Order (Child tables first)
+-- --------------------------------------------------------
+DROP TABLE IF EXISTS student_selected_answers;
+DROP TABLE IF EXISTS exam_answers;
+DROP TABLE IF EXISTS exam_questions;
+DROP TABLE IF EXISTS question_answers;
+DROP TABLE IF EXISTS questions;
+DROP TABLE IF EXISTS exams;
+DROP TABLE IF EXISTS courses;
+DROP TABLE IF EXISTS users;
 
-USE `hsts_db`;
+-- --------------------------------------------------------
+-- 1. Table Structure: users
+-- --------------------------------------------------------
+CREATE TABLE users (
+                       username VARCHAR(50) PRIMARY KEY,
+                       password VARCHAR(255) NOT NULL,
+                       full_name VARCHAR(100) NOT NULL,
+                       role ENUM('STUDENT', 'TEACHER', 'COORDINATOR', 'PRINCIPAL') NOT NULL,
+                       email VARCHAR(100)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 1. Users Table
-DROP TABLE IF EXISTS `users`;
-CREATE TABLE `users` (
-                         `username` VARCHAR(50) NOT NULL,
-                         `password` VARCHAR(255) NOT NULL,
-                         `role` VARCHAR(30) DEFAULT 'Teacher',
-                         `is_logged_in` TINYINT(1) DEFAULT '0',
-                         PRIMARY KEY (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- Seed Users
+INSERT INTO users (username, password, full_name, role, email) VALUES
+                                                                   ('student1', '123456', 'Alice Smith', 'STUDENT', 'alice@school.edu'),
+                                                                   ('teacher1', '123456', 'Dr. Robert Laganiere', 'TEACHER', 'robert@school.edu'),
+                                                                   ('coord1', '123456', 'Prof. Timothy Lethbridge', 'COORDINATOR', 'timothy@school.edu'),
+                                                                   ('principal1', '123456', 'Dr. School Principal', 'PRINCIPAL', 'principal@school.edu');
 
--- 2. Courses Table
-DROP TABLE IF EXISTS `courses`;
-CREATE TABLE `courses` (
-                           `course_id` VARCHAR(10) NOT NULL,
-                           `name` VARCHAR(100) NOT NULL,
-                           PRIMARY KEY (`course_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- --------------------------------------------------------
+-- 2. Table Structure: courses
+-- --------------------------------------------------------
+CREATE TABLE courses (
+                         course_id VARCHAR(10) PRIMARY KEY,
+                         name VARCHAR(100) NOT NULL,
+                         subject_code VARCHAR(10) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. Questions Bank Table
-DROP TABLE IF EXISTS `questions`;
-CREATE TABLE `questions` (
-                             `question_id` VARCHAR(10) NOT NULL,
-                             `text` TEXT NOT NULL,
-                             `difficulty` VARCHAR(20) NOT NULL,
-                             `instructions` TEXT,
-                             `topic` VARCHAR(100) NOT NULL,
-                             `course_id` VARCHAR(10) DEFAULT NULL,
-                             PRIMARY KEY (`question_id`),
-                             KEY `course_id` (`course_id`),
-                             CONSTRAINT `questions_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- Seed Courses
+INSERT INTO courses (course_id, name, subject_code) VALUES
+                                                        ('CS101', 'Computer Science Fundamentals', 'CS'),
+                                                        ('MATH201', 'Linear Algebra & Calculus', 'MATH');
 
--- 4. Question Options & Correct Answers Table
-DROP TABLE IF EXISTS `question_answers`;
-CREATE TABLE `question_answers` (
-                                    `id` INT NOT NULL AUTO_INCREMENT,
-                                    `question_id` VARCHAR(10) DEFAULT NULL,
-                                    `answer_text` TEXT NOT NULL,
-                                    `is_correct` TINYINT(1) DEFAULT '0',
-                                    PRIMARY KEY (`id`),
-                                    KEY `question_id` (`question_id`),
-                                    CONSTRAINT `question_answers_ibfk_1` FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- --------------------------------------------------------
+-- 3. Table Structure: questions
+-- --------------------------------------------------------
+CREATE TABLE questions (
+                           question_id VARCHAR(10) PRIMARY KEY,
+                           text TEXT NOT NULL,
+                           difficulty ENUM('EASY', 'MEDIUM', 'HARD') NOT NULL,
+                           instructions TEXT,
+                           topic VARCHAR(100),
+                           course_id VARCHAR(10),
+                           FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Exams Metadata Table
-DROP TABLE IF EXISTS `exams`;
-CREATE TABLE `exams` (
-                         `exam_id` VARCHAR(20) NOT NULL,
-                         `course_id` VARCHAR(10) NOT NULL,
-                         `title` VARCHAR(150) NOT NULL,
-                         `instructions` TEXT,
-                         `duration_minutes` INT NOT NULL,
-                         `status` VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
-                         `created_by_teacher_id` VARCHAR(50) NOT NULL,
-                         `approved_by_coordinator_id` VARCHAR(50) DEFAULT NULL,
-                         `rejection_reason` TEXT,
-                         `scheduled_start` DATETIME DEFAULT NULL,
-                         `scheduled_end` DATETIME DEFAULT NULL,
-                         PRIMARY KEY (`exam_id`),
-                         KEY `course_id` (`course_id`),
-                         CONSTRAINT `exams_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- Seed Questions
+INSERT INTO questions (question_id, text, difficulty, instructions, topic, course_id) VALUES
+                                                                                          ('11001', 'What is the main function of the CPU?', 'EASY', 'Select the best single option.', 'Architecture', 'CS101'),
+                                                                                          ('11002', 'Which data structure follows LIFO order?', 'EASY', 'Select the correct memory structure.', 'Data Structures', 'CS101'),
+                                                                                          ('11003', 'What is the advantage of multi-threading?', 'MEDIUM', 'Select performance benefit.', 'Concurrency', 'CS101'),
+                                                                                          ('11004', 'What does Foreign Key ensure in relational DBs?', 'MEDIUM', 'Select relational property.', 'Databases', 'CS101'),
+                                                                                          ('11005', 'What is binary search time complexity?', 'HARD', 'Assume sorted array.', 'Algorithms', 'CS101');
 
--- 6. Exam-to-Questions Junction Table
-DROP TABLE IF EXISTS `exam_questions`;
-CREATE TABLE `exam_questions` (
-                                  `exam_id` VARCHAR(20) NOT NULL,
-                                  `question_id` VARCHAR(10) NOT NULL,
-                                  `question_order` INT NOT NULL,
-                                  PRIMARY KEY (`exam_id`,`question_id`),
-                                  KEY `question_id` (`question_id`),
-                                  CONSTRAINT `exam_questions_ibfk_1` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`exam_id`) ON DELETE CASCADE,
-                                  CONSTRAINT `exam_questions_ibfk_2` FOREIGN KEY (`question_id`) REFERENCES `questions` (`question_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- --------------------------------------------------------
+-- 4. Table Structure: question_answers
+-- --------------------------------------------------------
+CREATE TABLE question_answers (
+                                  answer_id INT AUTO_INCREMENT PRIMARY KEY,
+                                  question_id VARCHAR(10) NOT NULL,
+                                  answer_text VARCHAR(255) NOT NULL,
+                                  is_correct TINYINT(1) DEFAULT 0,
+                                  FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. Student Exam Answers & Attempts Table (*UPDATED WITH UNIQUE CONSTRAINT*)
-DROP TABLE IF EXISTS `exam_answers`;
-CREATE TABLE `exam_answers` (
-                                `exam_answer_id` VARCHAR(20) NOT NULL,
-                                `exam_id` VARCHAR(20) NOT NULL,
-                                `student_id` VARCHAR(50) NOT NULL,
-                                `started_at` DATETIME DEFAULT NULL,
-                                `submitted_at` DATETIME DEFAULT NULL,
-                                `auto_submitted` TINYINT(1) DEFAULT '0',
-                                `auto_score` DOUBLE DEFAULT NULL,
-                                `final_score` DOUBLE DEFAULT NULL,
-                                `teacher_comment` TEXT,
-                                `grade_confirmed` TINYINT(1) DEFAULT '0',
-                                `extra_minutes_granted` INT DEFAULT '0',
-                                PRIMARY KEY (`exam_answer_id`),
-                                UNIQUE KEY `unique_student_exam` (`student_id`, `exam_id`), -- Enforces 1 attempt per student
-                                KEY `exam_id` (`exam_id`),
-                                KEY `student_id` (`student_id`),
-                                CONSTRAINT `exam_answers_ibfk_1` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`exam_id`),
-                                CONSTRAINT `exam_answers_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `users` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- Seed Question Choices
+INSERT INTO question_answers (question_id, answer_text, is_correct) VALUES
+                                                                        ('11001', 'Execute instructions and perform arithmetic/logic operations', 1),
+                                                                        ('11001', 'Store long-term hard disk files', 0),
+                                                                        ('11002', 'Stack', 1),
+                                                                        ('11002', 'Queue', 0),
+                                                                        ('11003', 'Allows concurrent execution of tasks to maximize CPU utilization', 1),
+                                                                        ('11003', 'Prevents all memory allocation', 0),
+                                                                        ('11004', 'Referential Integrity between tables', 1),
+                                                                        ('11004', 'Faster network socket streaming', 0),
+                                                                        ('11005', 'O(log n)', 1),
+                                                                        ('11005', 'O(1)', 0);
 
--- 8. Student Selected Choices Mapping Table
-DROP TABLE IF EXISTS `student_selected_answers`;
-CREATE TABLE `student_selected_answers` (
-                                            `exam_answer_id` VARCHAR(20) NOT NULL,
-                                            `question_id` VARCHAR(10) NOT NULL,
-                                            `selected_answer_text` TEXT,
-                                            PRIMARY KEY (`exam_answer_id`,`question_id`),
-                                            CONSTRAINT `student_selected_answers_ibfk_1` FOREIGN KEY (`exam_answer_id`) REFERENCES `exam_answers` (`exam_answer_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- --------------------------------------------------------
+-- 5. Table Structure: exams
+-- --------------------------------------------------------
+CREATE TABLE exams (
+                       exam_id VARCHAR(10) PRIMARY KEY,
+                       course_id VARCHAR(10) NOT NULL,
+                       title VARCHAR(100) NOT NULL,
+                       instructions TEXT,
+                       duration_minutes INT NOT NULL,
+                       created_by_teacher_id VARCHAR(50) NOT NULL,
+                       status ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED') DEFAULT 'DRAFT',
+                       rejection_reason TEXT,
+                       approved_by_coordinator_id VARCHAR(50),
+                       execution_code VARCHAR(10),
+                       scheduled_start DATETIME,
+                       scheduled_end DATETIME,
+                       FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+                       FOREIGN KEY (created_by_teacher_id) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 9. AI/Bot Interactions Table
-DROP TABLE IF EXISTS `bot_interactions`;
-CREATE TABLE `bot_interactions` (
-                                    `interaction_id` VARCHAR(50) NOT NULL,
-                                    `student_id` VARCHAR(50) NOT NULL,
-                                    `course_id` VARCHAR(20) DEFAULT NULL,
-                                    `user_question` TEXT NOT NULL,
-                                    `bot_response` TEXT NOT NULL,
-                                    `timestamp` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                                    PRIMARY KEY (`interaction_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- Seed Approved Active Exam (Code: HKD6)
+INSERT INTO exams (
+    exam_id, course_id, title, instructions, duration_minutes,
+    created_by_teacher_id, status, execution_code, scheduled_start, scheduled_end
+) VALUES (
+             'E72874', 'CS101', 'Test-exam', 'Complete all questions within duration.', 60,
+             'teacher1', 'APPROVED', 'HKD6', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 14 DAY)
+         );
 
--- =============================================================
--- INITIAL SEED DATA
--- =============================================================
+-- --------------------------------------------------------
+-- 6. Table Structure: exam_questions (Join Table)
+-- --------------------------------------------------------
+CREATE TABLE exam_questions (
+                                exam_id VARCHAR(10) NOT NULL,
+                                question_id VARCHAR(10) NOT NULL,
+                                question_order INT DEFAULT 1,
+                                PRIMARY KEY (exam_id, question_id),
+                                FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
+                                FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `users` (`username`, `password`, `role`, `is_logged_in`) VALUES
-                                                                         ('admin', '123456', 'Teacher', 0),
-                                                                         ('teacher1', 'password123', 'TEACHER', 0),
-                                                                         ('teacher2', 'password123', 'TEACHER', 0),
-                                                                         ('coord1', 'password123', 'COORDINATOR', 0),
-                                                                         ('student1', 'password123', 'STUDENT', 0);
+-- Seed Questions Linked to Exam E72874
+INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES
+                                                                      ('E72874', '11001', 1),
+                                                                      ('E72874', '11002', 2),
+                                                                      ('E72874', '11003', 3),
+                                                                      ('E72874', '11004', 4),
+                                                                      ('E72874', '11005', 5);
 
-INSERT INTO `courses` (`course_id`, `name`) VALUES
-                                                ('11', 'Introduction to Computer Science'),
-                                                ('22', 'Mathematical Logic'),
-                                                ('33', 'Database Systems');
+-- --------------------------------------------------------
+-- 7. Table Structure: exam_answers
+-- --------------------------------------------------------
+CREATE TABLE exam_answers (
+                              exam_answer_id VARCHAR(20) PRIMARY KEY,
+                              exam_id VARCHAR(10) NOT NULL,
+                              student_id VARCHAR(50) NOT NULL,
+                              auto_score DOUBLE DEFAULT 0.0,
+                              final_score DOUBLE DEFAULT 0.0,
+                              teacher_comment TEXT,
+                              grade_confirmed TINYINT(1) DEFAULT 0,
+                              submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                              auto_submitted TINYINT(1) DEFAULT 0,
+                              FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
+                              FOREIGN KEY (student_id) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `questions` (`question_id`, `text`, `difficulty`, `instructions`, `topic`, `course_id`) VALUES
-                                                                                                        ('11001', 'What is the time complexity of searching in a perfectly balanced Binary Search Tree (BST)?', 'MEDIUM', 'Choose the single most accurate asymptotic upper bound.', 'Data Structures', '11'),
-                                                                                                        ('11002', 'Which of the following data structures operates strictly on a Last-In, First-Out (LIFO) basis?', 'EASY', 'Select the correct foundational abstract data type.', 'Data Structures', '11'),
-                                                                                                        ('11003', 'What occurs when a Java subclass defines a method with the same signature as a superclass method?', 'MEDIUM', 'Assume standard object-oriented programming conventions.', 'Object-Oriented Programming', '11'),
-                                                                                                        ('22001', 'Which of the following propositions is logically equivalent to the conditional statement p -> q?', 'MEDIUM', 'Apply standard logical equivalences.', 'Propositional Logic', '22'),
-                                                                                                        ('33001', 'Which relational algebra operation filters out rows from a table based on a specified condition?', 'HARD', 'Select the fundamental unary operator symbol.', 'Relational Algebra', '33');
-
-INSERT INTO `question_answers` (`id`, `question_id`, `answer_text`, `is_correct`) VALUES
-                                                                                      (1, '22001', 'q -> p', 0),
-                                                                                      (2, '22001', 'not p or q', 1),
-                                                                                      (3, '22001', 'p and not q', 0),
-                                                                                      (4, '22001', 'not p and not q', 0),
-                                                                                      (5, '11001', 'O(1)', 0),
-                                                                                      (6, '11001', 'O(log n)', 1),
-                                                                                      (7, '11001', 'O(n)', 0),
-                                                                                      (8, '11001', 'O(n log n)', 0),
-                                                                                      (9, '11002', 'Queue', 0),
-                                                                                      (10, '11002', 'Stack', 1),
-                                                                                      (11, '11002', 'Singly Linked List', 0),
-                                                                                      (12, '11002', 'Binary Tree', 0),
-                                                                                      (13, '11003', 'Method Overloading', 0),
-                                                                                      (14, '11003', 'Method Overriding', 1),
-                                                                                      (15, '11003', 'Compilation Error', 0),
-                                                                                      (16, '11003', 'Encapsulation Violation', 0),
-                                                                                      (25, '33001', 'Selection (σ)', 1),
-                                                                                      (26, '33001', 'Projection (π)', 0),
-                                                                                      (27, '33001', 'Join (⋈)', 0),
-                                                                                      (28, '33001', 'Union (∪)', 0);
-
--- Re-enable foreign key checks
-SET FOREIGN_KEY_CHECKS = 1;
+-- --------------------------------------------------------
+-- 8. Table Structure: student_selected_answers
+-- --------------------------------------------------------
+CREATE TABLE student_selected_answers (
+                                          selected_answer_id INT AUTO_INCREMENT PRIMARY KEY,
+                                          exam_answer_id VARCHAR(20) NOT NULL,
+                                          question_id VARCHAR(10) NOT NULL,
+                                          selected_answer_text VARCHAR(255), -- 👈 Renamed to match ExamAnswerRepositoryImpl
+                                          FOREIGN KEY (exam_answer_id) REFERENCES exam_answers(exam_answer_id) ON DELETE CASCADE,
+                                          FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

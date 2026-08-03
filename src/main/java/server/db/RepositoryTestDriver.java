@@ -1,111 +1,54 @@
-package server.db;
+import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.net.dto.SubmitExamData;
+import server.controllers.ExamServerController;
+import server.db.DatabaseManager;
 
-import com.hsts.shared.model.*;
-import server.db.repository.ExamAnswerRepositoryImpl;
-import server.db.repository.ExamRepositoryImpl;
-
-import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public class RepositoryTestDriver {
 
     public static void main(String[] args) {
-        System.out.println("=== STARTING REPOSITORY & DB INTEGRATION TEST ===");
-
-        // 1. Connect to MySQL Database
-        DatabaseManager dbManager = DatabaseManager.getInstance();
-        if (!dbManager.connect()) {
-            System.err.println(">>> FATAL: Database connection failed. Aborting test.");
+        // 1. Connect to Database
+        DatabaseManager db = DatabaseManager.getInstance();
+        if (!db.connect()) {
+            System.err.println("Database connection failed!");
             return;
         }
 
-        ExamRepositoryImpl examRepo = new ExamRepositoryImpl();
-        ExamAnswerRepositoryImpl answerRepo = new ExamAnswerRepositoryImpl();
+        // 2. Instantiate Controller
+        ExamServerController controller = new ExamServerController();
 
-        try {
-            // -------------------------------------------------------------
-            // TEST 1: Create and Save a Test Exam
-            // -------------------------------------------------------------
-            System.out.println("\n--- TEST 1: Saving a Test Exam ---");
+        // 3. Prepare Simulated Student Answers for Exam E72874
+        // Questions: 11001 to 11005 (20 points each)
+        Map<String, String> studentAnswers = new HashMap<>();
 
-            // Build dummy question using seeded question ID "11001" from your DB
-            Question testQuestion = new Question();
-            testQuestion.setQuestionId("11001");
+        // Correct answers
+        studentAnswers.put("11001", "Execute instructions and perform arithmetic/logic operations");
+        studentAnswers.put("11002", "Stack");
+        studentAnswers.put("11003", "Allows concurrent execution of tasks to maximize CPU utilization");
+        studentAnswers.put("11004", "Referential Integrity between tables");
 
-            Exam testExam = new Exam("E100", "11", "Midterm Exam 2026",
-                    "Answer all questions carefully.", List.of(testQuestion), 60, "teacher1");
-            testExam.setStatus(ExamStatus.DRAFT);
+        // WRONG answer on purpose to test partial score (Expected: 80.0 / 100)
+        studentAnswers.put("11005", "O(1)");
 
-            boolean savedExam = examRepo.save(testExam);
-            System.out.println("Exam saved to MySQL: " + savedExam);
+        SubmitExamData submitData = new SubmitExamData("E72874", "student1", studentAnswers, false);
 
-            // -------------------------------------------------------------
-            // TEST 2: Retrieve Exam by ID from Database
-            // -------------------------------------------------------------
-            System.out.println("\n--- TEST 2: Reading Exam 'E100' back from DB ---");
-            examRepo.findById("E100").ifPresentOrElse(
-                    exam -> {
-                        System.out.println("✓ Found Exam: " + exam.getTitle() + " | Status: " + exam.getStatus());
-                        System.out.println("  Linked Questions Count: " + exam.getQuestions().size());
-                    },
-                    () -> System.err.println("❌ Failed to find exam 'E100'!")
-            );
+        // 4. Execute Submission Logic
+        System.out.println("\n--- SUBMITTING EXAM FOR AUTO-GRADING ---");
+        ExamAnswer result = controller.submitExam(submitData);
 
-            // -------------------------------------------------------------
-            // TEST 3: Update Exam Status (Approval Simulation)
-            // -------------------------------------------------------------
-            System.out.println("\n--- TEST 3: Updating Exam Status to APPROVED ---");
-            testExam.setStatus(ExamStatus.APPROVED);
-            testExam.setApprovedByCoordinatorId("coord1");
-            boolean updatedExam = examRepo.update(testExam);
-            System.out.println("Exam update status: " + updatedExam);
-
-            // -------------------------------------------------------------
-            // TEST 4: Record Student Exam Submission
-            // -------------------------------------------------------------
-            System.out.println("\n--- TEST 4: Saving Student Submission ---");
-            // Uses student username 'admin' or any valid user in your users table
-            ExamAnswer studentAttempt = new ExamAnswer("EA100", "E100", "admin");
-            studentAttempt.setStartedAt(LocalDateTime.now().minusMinutes(30));
-            studentAttempt.setSubmittedAt(LocalDateTime.now());
-            studentAttempt.setAutoScore(85.0);
-            studentAttempt.getSelectedAnswers().put("11001", "O(log n)");
-
-            boolean savedAnswer = answerRepo.save(studentAttempt);
-            System.out.println("Student Answer saved: " + savedAnswer);
-
-            // -------------------------------------------------------------
-            // TEST 5: Update Grade & Confirm
-            // -------------------------------------------------------------
-            System.out.println("\n--- TEST 5: Confirming Grade ---");
-            studentAttempt.setFinalScore(90.0);
-            studentAttempt.setTeacherComment("Great work on question 1!");
-            studentAttempt.setGradeConfirmed(true);
-            boolean updatedAnswer = answerRepo.update(studentAttempt);
-            System.out.println("Grade update confirmed: " + updatedAnswer);
-
-            // Read answer back
-            answerRepo.findById("EA100").ifPresent(ans ->
-                    System.out.println("✓ Read back Answer EA100: Final Score = " + ans.getFinalScore()
-                            + " | Comment = " + ans.getTeacherComment())
-            );
-
-            // -------------------------------------------------------------
-            // CLEANUP: Delete test records
-            // -------------------------------------------------------------
-            System.out.println("\n--- CLEANUP: Removing Test Data ---");
-            boolean deletedAnswer = answerRepo.deleteById("EA100");
-            boolean deletedExam = examRepo.deleteById("E100");
-            System.out.println("Deleted test answer EA100: " + deletedAnswer);
-            System.out.println("Deleted test exam E100: " + deletedExam);
-
-            System.out.println("\n=== ALL REPOSITORY TESTS PASSED SUCCESSFULLY! ===");
-
-        } catch (Exception e) {
-            System.err.println("❌ TEST FAILED WITH EXCEPTION:");
-            e.printStackTrace();
-        } finally {
-            dbManager.disconnect();
+        // 5. Assert Results
+        if (result != null) {
+            System.out.println("✅ SUBMISSION SUCCESSFUL!");
+            System.out.println("Answer Record ID: " + result.getExamAnswerId());
+            System.out.println("Student ID: " + result.getStudentId());
+            System.out.println("Auto Score: " + result.getAutoScore() + " / 100.0");
+            System.out.println("Final Score: " + result.getFinalScore());
+        } else {
+            System.out.println("❌ SUBMISSION FAILED (Check if student already submitted or exam window expired)");
         }
+
+        db.disconnect();
     }
 }

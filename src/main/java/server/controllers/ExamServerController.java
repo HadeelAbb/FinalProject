@@ -59,6 +59,7 @@ public class ExamServerController {
             exam.setApprovedByCoordinatorId(coordinatorId);
             exam.setScheduledStart(LocalDateTime.now());
             exam.setScheduledEnd(LocalDateTime.now().plusDays(14)); // Scheduled active window
+            exam.setExecutionCode(generateExecutionCode());
             return examRepository.update(exam) ? exam : null;
         }
         return null;
@@ -74,6 +75,36 @@ public class ExamServerController {
             return examRepository.update(exam) ? exam : null;
         }
         return null;
+    }
+    // SUC-6: Start Exam - Enforces 4-Character Execution Code Verification
+    public Exam startExam(StartExamData data, String submittedExecutionCode) {
+        Optional<Exam> opt = examRepository.findById(data.getExamId());
+        if (opt.isEmpty()) {
+            System.err.println("Start rejected: Exam " + data.getExamId() + " not found.");
+            return null;
+        }
+
+        Exam exam = opt.get();
+
+        // 1. Check if exam is approved
+        if (exam.getStatus() != ExamStatus.APPROVED) {
+            System.err.println("Start rejected: Exam is not approved.");
+            return null;
+        }
+
+        // 2. Validate 4-character execution code (case-insensitive)
+        if (exam.getExecutionCode() != null && !exam.getExecutionCode().equalsIgnoreCase(submittedExecutionCode)) {
+            System.err.println("Start rejected: Invalid execution code provided for exam " + data.getExamId());
+            return null;
+        }
+
+        // 3. Check if student already submitted
+        if (hasStudentAlreadySubmitted(data.getStudentId(), data.getExamId())) {
+            System.err.println("Start rejected: Student " + data.getStudentId() + " already took this exam.");
+            return null;
+        }
+
+        return exam; // Execution code verified; return exam payload
     }
 
     // SUC-6: Submit Exam & Auto-Grade Multiple Choice Options
@@ -127,6 +158,37 @@ public class ExamServerController {
 
         return answerRepository.save(answer) ? answer : null;
     }
+    // SUC-6: Retrieve Approved Exam Directly by 4-Character Execution Code
+    public Exam getExamByExecutionCode(String executionCode) {
+        if (executionCode == null || executionCode.trim().length() != 4) {
+            System.err.println("[EXAM-SERVER] Invalid execution code format.");
+            return null;
+        }
+
+        String sql = "SELECT exam_id FROM exams WHERE LOWER(execution_code) = LOWER(?) AND status = 'APPROVED'";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return null;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, executionCode.trim());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String examId = rs.getString("exam_id");
+                    Optional<Exam> optExam = examRepository.findById(examId);
+                    if (optExam.isPresent()) {
+                        System.out.println("[EXAM-SERVER] Successfully fetched exam [" + examId + "] via code: " + executionCode);
+                        return optExam.get();
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[EXAM-SERVER ERROR] Failed to fetch exam by execution code: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        System.err.println("[EXAM-SERVER] No approved exam found for execution code: " + executionCode);
+        return null;
+    }
 
     // SUC-7: Teacher Grade Confirmation / Score Override
     public boolean confirmGrade(ConfirmGradeData data) {
@@ -142,6 +204,15 @@ public class ExamServerController {
     }
 
     // Helpers
+    private String generateExecutionCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder code = new StringBuilder();
+        java.util.Random rnd = new java.util.Random();
+        for (int i = 0; i < 4; i++) {
+            code.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return code.toString();
+    }
     private boolean hasStudentAlreadySubmitted(String studentId, String examId) {
         String sql = "SELECT COUNT(*) FROM exam_answers WHERE student_id = ? AND exam_id = ?";
         Connection conn = dbManager.getConnection();
