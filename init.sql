@@ -34,6 +34,7 @@ USE hsts_db;
 -- --------------------------------------------------------
 -- Drop Tables in Reverse Dependency Order (Child tables first)
 -- --------------------------------------------------------
+DROP TABLE IF EXISTS bot_interactions;
 DROP TABLE IF EXISTS student_selected_answers;
 DROP TABLE IF EXISTS exam_answers;
 DROP TABLE IF EXISTS exam_questions;
@@ -196,4 +197,14 @@ CREATE TABLE student_selected_answers (
                                           selected_answer_text VARCHAR(255), -- 👈 Renamed to match ExamAnswerRepositoryImpl
                                           FOREIGN KEY (exam_answer_id) REFERENCES exam_answers(exam_answer_id) ON DELETE CASCADE,
                                           FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE bot_interactions (
+                                  interaction_id VARCHAR(20) PRIMARY KEY,
+                                  student_id VARCHAR(50) NOT NULL,
+                                  course_id VARCHAR(10) NOT NULL,
+                                  user_question TEXT,
+                                  bot_response TEXT,
+                                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                  FOREIGN KEY (student_id) REFERENCES users(username) ON DELETE CASCADE,
+                                  FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

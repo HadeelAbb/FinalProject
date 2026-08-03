@@ -182,10 +182,26 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
                     q.setInstructions(rs.getString("instructions"));
                     q.setTopic(rs.getString("topic"));
                     q.setCourseId(rs.getString("course_id"));
+                    q.setAnswers(findAnswersForQuestion(q.getQuestionId(), conn));
                     questions.add(q);
                 }
             }
         }
         return questions;
+    }
+
+    /** Loads the answer choices for one question - without this, exam-taking shows no options at all. */
+    private List<QuestionAnswer> findAnswersForQuestion(String questionId, Connection conn) throws SQLException {
+        List<QuestionAnswer> answers = new ArrayList<>();
+        String sql = "SELECT answer_text, is_correct FROM question_answers WHERE question_id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, questionId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    answers.add(new QuestionAnswer(rs.getString("answer_text"), rs.getBoolean("is_correct")));
+                }
+            }
+        }
+        return answers;
     }
 }
