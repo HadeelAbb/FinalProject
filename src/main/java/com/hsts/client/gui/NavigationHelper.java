@@ -64,19 +64,33 @@ public final class NavigationHelper {
         }
     }
 
-    private static void goToLogin(Node anyNodeInScene, ServerConnection client) {
+    /**
+     * Replaces the given stage's scene with a fresh login screen using the
+     * provided controller (and therefore the same {@link ServerConnection}).
+     * Used by normal logout navigation and by connection-loss recovery in MainApp.
+     */
+    public static LoginWindow showLogin(Stage stage, LoginClientController loginController) {
+        if (stage == null || loginController == null) {
+            return null;
+        }
         try {
             FXMLLoader loader = new FXMLLoader(NavigationHelper.class.getResource("/com/hsts/client/gui/login.fxml"));
             Parent root = loader.load();
             LoginWindow loginWindow = loader.getController();
-            loginWindow.setController(new LoginClientController(client));
+            loginWindow.setController(loginController);
 
-            Stage stage = (Stage) anyNodeInScene.getScene().getWindow();
             stage.setTitle("HSTS - Login");
             stage.setScene(new Scene(root, 360, 280));
+            return loginWindow;
         } catch (IOException e) {
             // Same reasoning as above - a packaging problem, not something to show the user.
+            return null;
         }
+    }
+
+    private static void goToLogin(Node anyNodeInScene, ServerConnection client) {
+        Stage stage = (Stage) anyNodeInScene.getScene().getWindow();
+        showLogin(stage, new LoginClientController(client));
     }
 
     /** Simple yes/no confirmation for a risky one-shot action (e.g. submitting an exam). */
