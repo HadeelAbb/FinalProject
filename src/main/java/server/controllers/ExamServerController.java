@@ -203,6 +203,121 @@ public class ExamServerController {
         return false;
     }
 
+    // SUC-9: full exam detail (with questions and correct answers) for the grading screen
+    public Optional<Exam> getExamDetail(String examId) {
+        return examRepository.findById(examId);
+    }
+
+    // SUC-4: Submit a draft (or previously-rejected) exam for coordinator approval
+    public Exam submitForApproval(String examId) {
+        Optional<Exam> opt = examRepository.findById(examId);
+        if (opt.isEmpty()) {
+            return null;
+        }
+        Exam exam = opt.get();
+        if (exam.getStatus() != ExamStatus.DRAFT && exam.getStatus() != ExamStatus.REJECTED) {
+            System.err.println("Submit-for-approval rejected: exam " + examId + " is not a draft or rejected exam.");
+            return null;
+        }
+        exam.setStatus(ExamStatus.PENDING_APPROVAL);
+        exam.setRejectionReason(null);
+        return examRepository.update(exam) ? exam : null;
+    }
+
+    // SUC-2/3: exams a given teacher has created, any status (their "My Exams" list)
+    public List<Exam> getMyExams(String teacherId) {
+        List<Exam> all = examRepository.findAll();
+        List<Exam> mine = new ArrayList<>();
+        for (Exam e : all) {
+            if (teacherId != null && teacherId.equals(e.getCreatedByTeacherId())) {
+                mine.add(e);
+            }
+        }
+        return mine;
+    }
+
+    // SUC-4: exams currently waiting on a coordinator's decision
+    public List<Exam> getPendingApprovalExams() {
+        List<Exam> all = examRepository.findAll();
+        List<Exam> pending = new ArrayList<>();
+        for (Exam e : all) {
+            if (e.getStatus() == ExamStatus.PENDING_APPROVAL) {
+                pending.add(e);
+            }
+        }
+        return pending;
+    }
+
+    // SUC-6: exams a student can currently take (approved, not already submitted).
+    // NOTE: the schema has no student-course enrollment table yet, so unlike the
+    // mock's stricter version, this does not filter by course enrollment - it
+    // shows every approved exam the student hasn't already answered.
+    public List<Exam> getAvailableExams(String studentId) {
+        List<Exam> all = examRepository.findAll();
+        List<ExamAnswer> mineSoFar = answerRepository.findByStudentId(studentId);
+        List<Exam> available = new ArrayList<>();
+        for (Exam e : all) {
+            if (e.getStatus() != ExamStatus.APPROVED) {
+                continue;
+            }
+            boolean alreadyTaken = mineSoFar.stream().anyMatch(a -> a.getExamId().equals(e.getExamId()));
+            if (!alreadyTaken) {
+                available.add(e);
+            }
+        }
+        return available;
+    }
+
+    // SUC-9: a teacher's grading queue - submitted answers not yet confirmed, for exams they created
+    public List<ExamAnswer> getPendingGrading(String teacherId) {
+        return answerRepository.findPendingGradingForTeacher(teacherId);
+    }
+
+    // SUC-10: a student's own confirmed results
+    public List<ExamAnswer> getMyResults(String studentId) {
+        List<ExamAnswer> all = answerRepository.findByStudentId(studentId);
+        List<ExamAnswer> confirmed = new ArrayList<>();
+        for (ExamAnswer a : all) {
+            if (a.isGradeConfirmed()) {
+                confirmed.add(a);
+            }
+        }
+        return confirmed;
+    }
+
+    // SUC-10: a student's own graded copy - the exam (with correct answers) plus their answers.
+    // Returns a 2-element array [Exam, ExamAnswer], same shape the client already expects.
+    public Object[] getExamAnswerCopy(String examAnswerId, String studentId) {
+        Optional<ExamAnswer> opt = answerRepository.findById(examAnswerId);
+        if (opt.isEmpty()) {
+            return null;
+        }
+        ExamAnswer answer = opt.get();
+        if (!answer.getStudentId().equals(studentId) || !answer.isGradeConfirmed()) {
+            return null;
+        }
+        Optional<Exam> examOpt = examRepository.findById(answer.getExamId());
+        if (examOpt.isEmpty()) {
+            return null;
+        }
+        return new Object[]{examOpt.get(), answer};
+    }
+
+    // SUC-17: a teacher extends the time allowed for their own exam
+    public Exam extendExamTime(String examId, String teacherId, int additionalMinutes) {
+        Optional<Exam> opt = examRepository.findById(examId);
+        if (opt.isEmpty()) {
+            return null;
+        }
+        Exam exam = opt.get();
+        if (!exam.getCreatedByTeacherId().equals(teacherId)) {
+            System.err.println("Extend-time rejected: " + teacherId + " did not create exam " + examId);
+            return null;
+        }
+        exam.setDurationMinutes(exam.getDurationMinutes() + additionalMinutes);
+        return examRepository.update(exam) ? exam : null;
+    }
+
     // Helpers
     private String generateExecutionCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

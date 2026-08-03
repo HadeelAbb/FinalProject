@@ -4,6 +4,7 @@ import com.hsts.server.network.ConnectionRegistry;
 import com.hsts.server.network.HSTSServer;
 import com.hsts.server.network.ServerRequestRouter;
 import com.hsts.shared.model.BotInteraction;
+import com.hsts.shared.model.BotUsageStats;
 import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
@@ -22,10 +23,19 @@ import com.hsts.shared.net.dto.CreateQuestionData;
 import com.hsts.shared.net.dto.DeleteQuestionData;
 import com.hsts.shared.net.dto.EditQuestionData;
 import com.hsts.shared.net.dto.ExamApprovalDecisionData;
+import com.hsts.shared.net.dto.ExtendExamTimeData;
+import com.hsts.shared.net.dto.GetAvailableExamsData;
+import com.hsts.shared.net.dto.GetExamAnswerCopyData;
+import com.hsts.shared.net.dto.GetExamDetailData;
+import com.hsts.shared.net.dto.GetMyExamsData;
+import com.hsts.shared.net.dto.GetMyResultsData;
+import com.hsts.shared.net.dto.GetPendingGradingData;
 import com.hsts.shared.net.dto.LoginData;
 import com.hsts.shared.net.dto.LogoutData;
 import com.hsts.shared.net.dto.SearchQuestionsData;
+import com.hsts.shared.net.dto.StartExamData;
 import com.hsts.shared.net.dto.SubmitExamData;
+import com.hsts.shared.net.dto.SubmitExamForApprovalData;
 import ocsf.server.ConnectionToClient;
 import server.controllers.ExamServerController;
 import server.controllers.LoginServerController;
@@ -562,6 +572,100 @@ public class MainServerApp {
                     request.getRequestId()
             );
         });
+        // The client sends REJECT_EXAM as its own command (separate from
+        // APPROVE_EXAM) - this was previously unregistered, so every
+        // rejection from the Approval screen just failed with no handler.
+        router.registerHandler(Command.REJECT_EXAM, request -> {
+            ExamApprovalDecisionData data = (ExamApprovalDecisionData) request.getPayload();
+            if (data.getReason() == null || data.getReason().isBlank()) {
+                return Response.failure(Command.REJECT_EXAM, "A rejection reason is required.", request.getRequestId());
+            }
+            Exam exam = examServerController.rejectExam(data.getExamId(), data.getCoordinatorId(), data.getReason());
+            if (exam == null) {
+                return Response.failure(Command.REJECT_EXAM, "Exam rejection failed.", request.getRequestId());
+            }
+            return Response.success(Command.REJECT_EXAM, exam, "Exam rejected.", request.getRequestId());
+        });
+
+        router.registerHandler(Command.SUBMIT_EXAM_FOR_APPROVAL, request -> {
+            SubmitExamForApprovalData data = (SubmitExamForApprovalData) request.getPayload();
+            Exam exam = examServerController.submitForApproval(data.getExamId());
+            if (exam == null) {
+                return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
+                        "Only a draft or rejected exam can be submitted for approval.", request.getRequestId());
+            }
+            return Response.success(Command.SUBMIT_EXAM_FOR_APPROVAL, exam,
+                    "Exam submitted for approval.", request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_MY_EXAMS, request -> {
+            GetMyExamsData data = (GetMyExamsData) request.getPayload();
+            List<Exam> mine = examServerController.getMyExams(data.getTeacherId());
+            return Response.success(Command.GET_MY_EXAMS, mine, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_PENDING_APPROVAL_EXAMS, request -> {
+            List<Exam> pending = examServerController.getPendingApprovalExams();
+            return Response.success(Command.GET_PENDING_APPROVAL_EXAMS, pending, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_AVAILABLE_EXAMS, request -> {
+            GetAvailableExamsData data = (GetAvailableExamsData) request.getPayload();
+            List<Exam> available = examServerController.getAvailableExams(data.getStudentId());
+            return Response.success(Command.GET_AVAILABLE_EXAMS, available, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.START_EXAM, request -> {
+            StartExamData data = (StartExamData) request.getPayload();
+            Exam exam = examServerController.startExam(data, data.getExecutionCode());
+            if (exam == null) {
+                return Response.failure(Command.START_EXAM,
+                        "Could not start this exam - check the execution code, exam status, and whether you've already taken it.",
+                        request.getRequestId());
+            }
+            return Response.success(Command.START_EXAM, exam, "Exam started.", request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_EXAM_DETAIL, request -> {
+            GetExamDetailData data = (GetExamDetailData) request.getPayload();
+            var opt = examServerController.getExamDetail(data.getExamId());
+            if (opt.isEmpty()) {
+                return Response.failure(Command.GET_EXAM_DETAIL, "Exam not found.", request.getRequestId());
+            }
+            return Response.success(Command.GET_EXAM_DETAIL, opt.get(), null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_PENDING_GRADING, request -> {
+            GetPendingGradingData data = (GetPendingGradingData) request.getPayload();
+            List<ExamAnswer> pending = examServerController.getPendingGrading(data.getTeacherId());
+            return Response.success(Command.GET_PENDING_GRADING, pending, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_MY_RESULTS, request -> {
+            GetMyResultsData data = (GetMyResultsData) request.getPayload();
+            List<ExamAnswer> mine = examServerController.getMyResults(data.getStudentId());
+            return Response.success(Command.GET_MY_RESULTS, mine, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_EXAM_ANSWER_COPY, request -> {
+            GetExamAnswerCopyData data = (GetExamAnswerCopyData) request.getPayload();
+            Object[] copy = examServerController.getExamAnswerCopy(data.getExamAnswerId(), data.getStudentId());
+            if (copy == null) {
+                return Response.failure(Command.GET_EXAM_ANSWER_COPY, "Graded exam not found.", request.getRequestId());
+            }
+            return Response.success(Command.GET_EXAM_ANSWER_COPY, copy, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.EXTEND_EXAM_TIME, request -> {
+            ExtendExamTimeData data = (ExtendExamTimeData) request.getPayload();
+            Exam exam = examServerController.extendExamTime(data.getExamId(), data.getTeacherId(), data.getAdditionalMinutes());
+            if (exam == null) {
+                return Response.failure(Command.EXTEND_EXAM_TIME,
+                        "Could not extend time - check that you created this exam.", request.getRequestId());
+            }
+            return Response.success(Command.EXTEND_EXAM_TIME, exam,
+                    "Time extended by " + data.getAdditionalMinutes() + " minutes.", request.getRequestId());
+        });
     }
 
     // =========================================================================
@@ -634,6 +738,32 @@ public class MainServerApp {
                         "Database error: " + e.getMessage(),
                         request.getRequestId()
                 );
+            }
+        });
+        // NOTE: the schema has no teacher-course assignment table, so unlike
+        // the mock (which scopes this to the requesting teacher's own
+        // courses), this aggregates bot usage across every course that has
+        // any activity at all. Anonymized either way - never shows which
+        // student asked what, only per-course totals.
+        router.registerHandler(Command.GET_BOT_USAGE_STATS, request -> {
+            try {
+                List<BotInteraction> all = botRepository.findAll();
+                java.util.Map<String, java.util.List<BotInteraction>> byCourse = new java.util.LinkedHashMap<>();
+                for (BotInteraction interaction : all) {
+                    byCourse.computeIfAbsent(interaction.getCourseId(), k -> new java.util.ArrayList<>())
+                            .add(interaction);
+                }
+                List<BotUsageStats> stats = new java.util.ArrayList<>();
+                for (var entry : byCourse.entrySet()) {
+                    java.util.Set<String> uniqueStudents = new java.util.HashSet<>();
+                    for (BotInteraction i : entry.getValue()) {
+                        uniqueStudents.add(i.getStudentId());
+                    }
+                    stats.add(new BotUsageStats(entry.getKey(), entry.getValue().size(), uniqueStudents.size()));
+                }
+                return Response.success(Command.GET_BOT_USAGE_STATS, stats, null, request.getRequestId());
+            } catch (Exception e) {
+                return Response.failure(Command.GET_BOT_USAGE_STATS, "Database error: " + e.getMessage(), request.getRequestId());
             }
         });
     }

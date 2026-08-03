@@ -43,4 +43,25 @@ public class BotRepositoryImpl {
         }
         return history;
     }
+
+    /** All interactions across all students/courses - used to compute usage stats (SUC-13). */
+    public List<BotInteraction> findAll() throws SQLException {
+        List<BotInteraction> all = new ArrayList<>();
+        String sql = "SELECT * FROM bot_interactions";
+        try (Connection conn = DatabaseManager.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    all.add(new BotInteraction(
+                            rs.getString("interaction_id"),
+                            rs.getString("student_id"),
+                            rs.getString("course_id"),
+                            rs.getString("user_question"),
+                            rs.getString("bot_response")
+                    ));
+                }
+            }
+        }
+        return all;
+    }
 }

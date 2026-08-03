@@ -136,10 +136,7 @@ public class ApprovalWindow {
 
     public void onDecisionMade(Exam exam, String message) {
         setButtonsDisabled(false);
-        String codeNote = exam.getExecutionCode() != null
-                ? " - execution code: " + exam.getExecutionCode()
-                : "";
-        statusLabel.setText(message + " (" + exam.getExamId() + ")" + codeNote);
+        statusLabel.setText(message + " (" + exam.getExamId() + ")");
         reasonField.clear();
         controller.refreshPending();
     }

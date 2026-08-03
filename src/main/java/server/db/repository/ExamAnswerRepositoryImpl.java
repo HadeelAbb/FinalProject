@@ -208,4 +208,60 @@ public class ExamAnswerRepositoryImpl {
 
         return Optional.of(new ExamStats(examId, total, mean, median, deciles));
     }
+    /** All answers a student has submitted (used for "already taken" checks and SUC-10 results). */
+    public List<ExamAnswer> findByStudentId(String studentId) {
+        List<String> ids = new ArrayList<>();
+        String sql = "SELECT exam_answer_id FROM exam_answers WHERE student_id = ?";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return new ArrayList<>();
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, studentId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getString("exam_answer_id"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+
+        List<ExamAnswer> results = new ArrayList<>();
+        for (String id : ids) {
+            findById(id).ifPresent(results::add);
+        }
+        return results;
+    }
+
+    /**
+     * Submitted-but-not-yet-confirmed answers for exams a given teacher created
+     * (SUC-9: teacher's grading queue).
+     */
+    public List<ExamAnswer> findPendingGradingForTeacher(String teacherId) {
+        String sql = "SELECT ea.exam_answer_id FROM exam_answers ea " +
+                "JOIN exams e ON ea.exam_id = e.exam_id " +
+                "WHERE e.created_by_teacher_id = ? AND ea.grade_confirmed = 0 AND ea.submitted_at IS NOT NULL";
+        List<String> ids = new ArrayList<>();
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return new ArrayList<>();
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, teacherId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getString("exam_answer_id"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+
+        List<ExamAnswer> results = new ArrayList<>();
+        for (String id : ids) {
+            findById(id).ifPresent(results::add);
+        }
+        return results;
+    }
 }
