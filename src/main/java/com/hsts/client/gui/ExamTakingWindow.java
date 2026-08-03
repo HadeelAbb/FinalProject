@@ -17,6 +17,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.VBox;
@@ -31,6 +32,7 @@ public class ExamTakingWindow {
     @FXML private Button backButton;
     @FXML private Button logoutButton;
     @FXML private ListView<Exam> availableExamsView;
+    @FXML private TextField executionCodeField;
     @FXML private ListView<Question> questionsView;
     @FXML private Label instructionsLabel;
     @FXML private Label timerLabel;
@@ -51,7 +53,7 @@ public class ExamTakingWindow {
     private LoginClientController navLoginController;
 
     public void init(ExamTakingClientController controller, Student student,
-                      ServerConnection client, LoginClientController loginController) {
+                     ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.navUser = student;
         this.navClient = client;
@@ -95,8 +97,15 @@ public class ExamTakingWindow {
             showError("Select an exam first.");
             return;
         }
+        String code = executionCodeField.getText() != null
+                ? executionCodeField.getText().trim().toUpperCase()
+                : "";
+        if (code.length() != 4) {
+            showError("Enter the 4-character execution code for this exam.");
+            return;
+        }
         startButton.setDisable(true);
-        controller.startExam(selected.getExamId());
+        controller.startExam(selected.getExamId(), code);
     }
 
     public void onExamStarted(Exam exam) {
@@ -108,6 +117,7 @@ public class ExamTakingWindow {
         questionsView.getItems().setAll(exam.getQuestions());
         submitButton.setDisable(false);
         startButton.setDisable(true);
+        executionCodeField.setDisable(true);
         statusLabel.setText("Exam started - answer all questions before time runs out.");
         errorLabel.setText("");
         startTimer(exam.getDurationMinutes() * 60);
@@ -173,6 +183,8 @@ public class ExamTakingWindow {
         instructionsLabel.setText("");
         timerLabel.setText("");
         startButton.setDisable(false);
+        executionCodeField.setDisable(false);
+        executionCodeField.clear();
         controller.loadAvailableExams();
     }
 

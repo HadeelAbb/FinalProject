@@ -18,6 +18,8 @@ import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 public class QuestionManagementWindow {
 
@@ -136,7 +138,7 @@ public class QuestionManagementWindow {
     private com.hsts.client.controller.LoginClientController navLoginController;
 
     public void setNavigation(User user, com.hsts.client.network.ServerConnection client,
-                               com.hsts.client.controller.LoginClientController loginController) {
+                              com.hsts.client.controller.LoginClientController loginController) {
         this.navUser = user;
         this.navClient = client;
         this.navLoginController = loginController;
@@ -190,16 +192,23 @@ public class QuestionManagementWindow {
     private void handleSaveQuestion() {
         clearMessages();
 
-        String text = questionTextField.getText();
-        String instructions = instructionsField.getText();
+        String text = trimToNull(questionTextField.getText());
+        String instructions = trimToNull(instructionsField.getText());
         Difficulty difficulty = difficultySelector.getValue();
-        String topic = topicField.getText();
-        String imagePath = blankToNull(imagePathField.getText());
+        String topic = trimToNull(topicField.getText());
+        String imagePath = trimToNull(imagePathField.getText());
         Course selectedCourse = courseSelector.getValue();
 
-        if (text == null || text.isBlank() || difficulty == null || topic == null || topic.isBlank()
-                || selectedCourse == null) {
+        if (text == null || difficulty == null || topic == null || selectedCourse == null) {
             showError("Question text, difficulty, topic and course are required.");
+            return;
+        }
+        if (text.length() > 500) {
+            showError("Question text is too long (max 500 characters).");
+            return;
+        }
+        if (topic.length() > 100) {
+            showError("Topic is too long (max 100 characters).");
             return;
         }
 
@@ -331,9 +340,24 @@ public class QuestionManagementWindow {
         TextField[] fields = {answer1Field, answer2Field, answer3Field, answer4Field};
         RadioButton[] radios = {answer1Correct, answer2Correct, answer3Correct, answer4Correct};
 
-        for (TextField field : fields) {
-            if (field.getText() == null || field.getText().isBlank()) {
+        String[] trimmed = new String[4];
+        for (int i = 0; i < 4; i++) {
+            String value = trimToNull(fields[i].getText());
+            if (value == null) {
                 showError("All four answers must be filled in.");
+                return null;
+            }
+            if (value.length() > 200) {
+                showError("Answer " + (i + 1) + " is too long (max 200 characters).");
+                return null;
+            }
+            trimmed[i] = value;
+        }
+
+        Set<String> seen = new HashSet<>();
+        for (String value : trimmed) {
+            if (!seen.add(value.toLowerCase())) {
+                showError("Answers must be different from each other.");
                 return null;
             }
         }
@@ -346,7 +370,7 @@ public class QuestionManagementWindow {
 
         List<QuestionAnswer> answers = new java.util.ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            answers.add(new QuestionAnswer(fields[i].getText(), radios[i].isSelected()));
+            answers.add(new QuestionAnswer(trimmed[i], radios[i].isSelected()));
         }
         return answers;
     }
@@ -371,5 +395,14 @@ public class QuestionManagementWindow {
 
     private String blankToNull(String s) {
         return (s == null || s.isBlank()) ? null : s;
+    }
+
+    /** Like blankToNull, but also trims surrounding whitespace from raw text input. */
+    private String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

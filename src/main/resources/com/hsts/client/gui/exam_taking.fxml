@@ -4,6 +4,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
@@ -28,6 +29,8 @@
         <VBox spacing="6" style="-fx-padding: 10;" prefWidth="280">
             <Label text="Available exams:"/>
             <ListView fx:id="availableExamsView" prefHeight="360"/>
+            <Label text="Execution code:"/>
+            <TextField fx:id="executionCodeField" promptText="4-character code" maxWidth="140"/>
             <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam" styleClass="primary-button"/>
         </VBox>
     </left>

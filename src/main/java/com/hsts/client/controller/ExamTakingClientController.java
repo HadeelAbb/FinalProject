@@ -41,8 +41,9 @@ public class ExamTakingClientController implements ResponseHandler {
         client.sendToServer(Command.GET_AVAILABLE_EXAMS, new GetAvailableExamsData(currentStudent.getId()));
     }
 
-    public void startExam(String examId) {
-        client.sendToServer(Command.START_EXAM, new StartExamData(examId, currentStudent.getId()));
+    public void startExam(String examId, String executionCode) {
+        client.sendToServer(Command.START_EXAM,
+                new StartExamData(examId, currentStudent.getId(), executionCode));
     }
 
     public void submitExam(Map<String, String> selectedAnswers, boolean autoSubmitted) {

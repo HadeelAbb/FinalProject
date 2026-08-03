@@ -43,6 +43,7 @@ public class ExamBuilderWindow {
     @FXML private Spinner<Integer> autoCountSpinner;
     @FXML private TextArea instructionsField;
     @FXML private Button createButton;
+    @FXML private Button submitForApprovalButton;
     @FXML private Label draftSummaryLabel;
     @FXML private Label statusLabel;
     @FXML private Label errorLabel;
@@ -117,6 +118,7 @@ public class ExamBuilderWindow {
             return;
         }
         createButton.setDisable(true);
+        submitForApprovalButton.setDisable(true);
         statusLabel.setText("Creating exam...");
         if (manualModeRadio.isSelected()) {
             List<String> ids = new ArrayList<>();
@@ -145,6 +147,7 @@ public class ExamBuilderWindow {
 
     public void onExamCreated(Exam exam) {
         createButton.setDisable(false);
+        submitForApprovalButton.setDisable(false);
         draftSummaryLabel.setText(exam.getTitle() + " - " + exam.getQuestions().size() + " questions, "
                 + exam.getDurationMinutes() + " min, status: " + exam.getStatus());
         statusLabel.setText("Draft created. Review it, then submit for approval.");
@@ -152,6 +155,7 @@ public class ExamBuilderWindow {
     }
 
     public void onSubmittedForApproval(Exam exam) {
+        submitForApprovalButton.setDisable(true);
         statusLabel.setText("Submitted for approval - status: " + exam.getStatus());
     }
 

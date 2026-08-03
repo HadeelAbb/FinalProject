@@ -31,7 +31,7 @@ public class ApprovalWindow {
     private SubjectCoordinator navUser;
 
     public void init(ApprovalClientController controller, SubjectCoordinator coordinator,
-                      ServerConnection client, LoginClientController loginController) {
+                     ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.navUser = coordinator;
         this.navClient = client;
@@ -113,14 +113,33 @@ public class ApprovalWindow {
     }
 
     public void displayPending(java.util.List<Exam> exams) {
+        Exam previouslySelected = pendingListView.getSelectionModel().getSelectedItem();
         pendingListView.getItems().setAll(exams);
         errorLabel.setText("");
         setButtonsDisabled(false);
+
+        if (previouslySelected != null) {
+            // Exam now overrides equals()/hashCode() by examId, so this finds
+            // the same exam even though it's a freshly-deserialized instance -
+            // keeps the details/questions preview from clearing on every
+            // automatic refresh (e.g. another teacher's EXAM_EVENT broadcast).
+            for (Exam e : exams) {
+                if (e.equals(previouslySelected)) {
+                    pendingListView.getSelectionModel().select(e);
+                    return;
+                }
+            }
+        }
+        // Selected exam is no longer pending (approved/rejected elsewhere) - clear the preview.
+        showDetails(null);
     }
 
     public void onDecisionMade(Exam exam, String message) {
         setButtonsDisabled(false);
-        statusLabel.setText(message + " (" + exam.getExamId() + ")");
+        String codeNote = exam.getExecutionCode() != null
+                ? " - execution code: " + exam.getExecutionCode()
+                : "";
+        statusLabel.setText(message + " (" + exam.getExamId() + ")" + codeNote);
         reasonField.clear();
         controller.refreshPending();
     }

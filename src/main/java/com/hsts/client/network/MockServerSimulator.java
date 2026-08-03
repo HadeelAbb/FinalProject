@@ -387,6 +387,8 @@ public class MockServerSimulator {
         exam.setApprovedByCoordinatorId(data.getCoordinatorId());
         exam.setScheduledStart(LocalDateTime.now());
         exam.setScheduledEnd(LocalDateTime.now().plusDays(7));
+        exam.setExecutionCode(generateExecutionCode());
+        System.out.println("Execution code: " + exam.getExecutionCode());
         return Response.success(Command.APPROVE_EXAM, exam, "Exam approved.", null);
     }
 
@@ -423,6 +425,12 @@ public class MockServerSimulator {
         Exam exam = findExamById(data.getExamId());
         if (exam == null || exam.getStatus() != ExamStatus.APPROVED) {
             return Response.failure(Command.START_EXAM, "This exam is not available to take.", null);
+        }
+        System.out.println("Comparing exam code [" + exam.getExecutionCode() + "] to entered code [" + data.getExecutionCode() + "]");
+        if (exam.getExecutionCode() != null && data.getExecutionCode() != null) {
+            if (!exam.getExecutionCode().equalsIgnoreCase(data.getExecutionCode().trim())) {
+                return Response.failure(Command.START_EXAM, "Invalid execution code.", null);
+            }
         }
         boolean alreadyTaken = examAnswers.stream()
                 .anyMatch(a -> a.getExamId().equals(data.getExamId()) && a.getStudentId().equals(data.getStudentId()));
@@ -631,7 +639,15 @@ public class MockServerSimulator {
         botInteractionSeq++;
         return "BOT" + botInteractionSeq;
     }
-
+    private String generateExecutionCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        java.util.Random random = new java.util.Random();
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            code.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return code.toString();
+    }
     /**
      * Mirrors the ID scheme from the spec: 3-digit sequence number (per
      * course) + 2-digit course code, e.g. "00111", "00211" for course 11.
