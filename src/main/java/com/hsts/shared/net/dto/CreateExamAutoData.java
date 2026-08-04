@@ -14,6 +14,7 @@ public class CreateExamAutoData implements Serializable {
     private String courseId;
     private String title;
     private String instructionsForStudents;
+    private String instructionsForTeacher;
     private String topic;
     private Difficulty difficulty;
     private int numberOfQuestions;
@@ -23,7 +24,7 @@ public class CreateExamAutoData implements Serializable {
     }
 
     public CreateExamAutoData(String teacherId, String courseId, String title, String instructionsForStudents,
-                               String topic, Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
+                              String topic, Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
         this.teacherId = teacherId;
         this.courseId = courseId;
         this.title = title;
@@ -64,6 +65,14 @@ public class CreateExamAutoData implements Serializable {
 
     public void setInstructionsForStudents(String instructionsForStudents) {
         this.instructionsForStudents = instructionsForStudents;
+    }
+
+    public String getInstructionsForTeacher() {
+        return instructionsForTeacher;
+    }
+
+    public void setInstructionsForTeacher(String instructionsForTeacher) {
+        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public String getTopic() {

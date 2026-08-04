@@ -1,8 +1,11 @@
 package com.hsts.server;
 
 import com.hsts.server.network.ConnectionRegistry;
+import com.hsts.server.network.EventBus;
 import com.hsts.server.network.HSTSServer;
 import com.hsts.server.network.ServerRequestRouter;
+import com.hsts.shared.net.ExamEvent;
+import com.hsts.shared.net.EventType;
 import com.hsts.shared.model.BotInteraction;
 import com.hsts.shared.model.BotUsageStats;
 import com.hsts.shared.model.Course;
@@ -85,12 +88,13 @@ public class MainServerApp {
         ServerRequestRouter router = new ServerRequestRouter();
         HSTSServer server = new HSTSServer(PORT);
         ConnectionRegistry connectionRegistry = new ConnectionRegistry();
+        EventBus eventBus = new EventBus(server);
 
         server.setConnectionRegistry(connectionRegistry);
 
         registerAuthRoutes(router, loginServerController);
         registerQuestionRoutes(router, questionServerController, server);
-        registerExamRoutes(router, examServerController);
+        registerExamRoutes(router, examServerController, eventBus);
         registerBotRoutes(router, botRepository);
         configureSessionHandling(server, router, loginServerController, connectionRegistry);
 
@@ -464,7 +468,8 @@ public class MainServerApp {
     // =========================================================================
 
     private static void registerExamRoutes(ServerRequestRouter router,
-                                           ExamServerController examServerController) {
+                                           ExamServerController examServerController,
+                                           EventBus eventBus) {
         router.registerHandler(Command.CREATE_EXAM_MANUAL, request -> {
             CreateExamManualData data = (CreateExamManualData) request.getPayload();
             Exam exam = examServerController.createManualExam(data);
@@ -572,6 +577,7 @@ public class MainServerApp {
                     request.getRequestId()
             );
         });
+
         // The client sends REJECT_EXAM as its own command (separate from
         // APPROVE_EXAM) - this was previously unregistered, so every
         // rejection from the Approval screen just failed with no handler.
@@ -663,8 +669,19 @@ public class MainServerApp {
                 return Response.failure(Command.EXTEND_EXAM_TIME,
                         "Could not extend time - check that you created this exam.", request.getRequestId());
             }
+            // Spec: this is temporary and applies only to the current execution - so we
+            // push a live event to whoever is currently taking this exam, instead of
+            // persisting a duration change to the exam's base definition. Broadcast (no
+            // targetUserId) since the server has no record of exactly which students are
+            // mid-exam right now - each client filters locally by matching examId.
+            ExamEvent event = new ExamEvent(EventType.EXAM_TIME_EXTENDED, exam.getExamId(),
+                    exam.getCourseId(), null,
+                    "Your teacher extended this exam's time by " + data.getAdditionalMinutes() + " minutes.");
+            event.setExtraMinutes(data.getAdditionalMinutes());
+            eventBus.publish(event);
             return Response.success(Command.EXTEND_EXAM_TIME, exam,
-                    "Time extended by " + data.getAdditionalMinutes() + " minutes.", request.getRequestId());
+                    "Time extended by " + data.getAdditionalMinutes() + " minutes for students currently taking this exam.",
+                    request.getRequestId());
         });
     }
 
@@ -740,6 +757,7 @@ public class MainServerApp {
                 );
             }
         });
+
         // NOTE: the schema has no teacher-course assignment table, so unlike
         // the mock (which scopes this to the requesting teacher's own
         // courses), this aggregates bot usage across every course that has

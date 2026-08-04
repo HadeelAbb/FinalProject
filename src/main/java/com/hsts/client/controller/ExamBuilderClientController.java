@@ -43,18 +43,21 @@ public class ExamBuilderClientController implements ResponseHandler {
         this.currentTeacher = teacher;
     }
 
-    public void createManual(String courseId, String title, String instructions,
-                              List<String> questionIds, int durationMinutes) {
+    public void createManual(String courseId, String title, String instructions, String teacherNotes,
+                             List<String> questionIds, int durationMinutes) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
-        client.sendToServer(Command.CREATE_EXAM_MANUAL,
-                new CreateExamManualData(teacherId, courseId, title, instructions, questionIds, durationMinutes));
+        CreateExamManualData data = new CreateExamManualData(teacherId, courseId, title, instructions, questionIds, durationMinutes);
+        data.setInstructionsForTeacher(teacherNotes);
+        client.sendToServer(Command.CREATE_EXAM_MANUAL, data);
     }
 
-    public void createAuto(String courseId, String title, String instructions, String topic,
-                            Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
+    public void createAuto(String courseId, String title, String instructions, String teacherNotes, String topic,
+                           Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
-        client.sendToServer(Command.CREATE_EXAM_AUTO, new CreateExamAutoData(teacherId, courseId, title,
-                instructions, topic, difficulty, numberOfQuestions, durationMinutes));
+        CreateExamAutoData data = new CreateExamAutoData(teacherId, courseId, title,
+                instructions, topic, difficulty, numberOfQuestions, durationMinutes);
+        data.setInstructionsForTeacher(teacherNotes);
+        client.sendToServer(Command.CREATE_EXAM_AUTO, data);
     }
 
     public void submitForApproval() {

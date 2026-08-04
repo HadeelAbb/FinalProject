@@ -123,6 +123,13 @@ public class ExamTakingWindow {
         startTimer(exam.getDurationMinutes() * 60);
     }
 
+    /** Called when the teacher extends time mid-exam (SUC-17) - live push, this run only. */
+    public void onTimeExtended(int extraMinutes, String message) {
+        secondsRemaining += extraMinutes * 60;
+        updateTimerLabel();
+        statusLabel.setText(message);
+    }
+
     private void startTimer(int totalSeconds) {
         secondsRemaining = totalSeconds;
         updateTimerLabel();

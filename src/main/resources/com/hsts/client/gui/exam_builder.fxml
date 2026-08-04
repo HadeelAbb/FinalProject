@@ -71,6 +71,9 @@
             <Label text="Instructions for students:"/>
             <TextArea fx:id="instructionsField" prefHeight="100" wrapText="true"/>
 
+            <Label text="Notes for yourself (teachers only - never shown to students):"/>
+            <TextArea fx:id="teacherNotesField" prefHeight="70" wrapText="true"/>
+
             <HBox spacing="8">
                 <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)" styleClass="primary-button"/>
                 <Button fx:id="submitForApprovalButton" onAction="#handleSubmitForApproval"

@@ -29,6 +29,7 @@ public class ExamServerController {
         Exam exam = new Exam(newExamId, data.getCourseId(), data.getTitle(),
                 data.getInstructionsForStudents(), selectedQuestions, data.getDurationMinutes(), data.getTeacherId());
         exam.setStatus(ExamStatus.DRAFT);
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
 
         return examRepository.save(exam) ? exam : null;
     }
@@ -46,6 +47,7 @@ public class ExamServerController {
         Exam exam = new Exam(newExamId, data.getCourseId(), data.getTitle(),
                 data.getInstructionsForStudents(), matchingQuestions, data.getDurationMinutes(), data.getTeacherId());
         exam.setStatus(ExamStatus.DRAFT);
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
 
         return examRepository.save(exam) ? exam : null;
     }
@@ -303,7 +305,10 @@ public class ExamServerController {
         return new Object[]{examOpt.get(), answer};
     }
 
-    // SUC-17: a teacher extends the time allowed for their own exam
+    // SUC-17: a teacher extends the time for the CURRENT execution only (spec: temporary,
+    // applies only to this run, never changes the exam's base definition). This validates
+    // ownership and returns the exam - MainServerApp then pushes a live event to students
+    // currently taking it, instead of persisting a duration change to the exams table.
     public Exam extendExamTime(String examId, String teacherId, int additionalMinutes) {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isEmpty()) {
@@ -314,8 +319,7 @@ public class ExamServerController {
             System.err.println("Extend-time rejected: " + teacherId + " did not create exam " + examId);
             return null;
         }
-        exam.setDurationMinutes(exam.getDurationMinutes() + additionalMinutes);
-        return examRepository.update(exam) ? exam : null;
+        return exam;
     }
 
     // Helpers

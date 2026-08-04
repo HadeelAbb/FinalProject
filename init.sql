@@ -129,6 +129,7 @@ CREATE TABLE exams (
                        course_id VARCHAR(10) NOT NULL,
                        title VARCHAR(100) NOT NULL,
                        instructions TEXT,
+                       instructions_for_teacher TEXT,
                        duration_minutes INT NOT NULL,
                        created_by_teacher_id VARCHAR(50) NOT NULL,
                        status ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED') DEFAULT 'DRAFT',

@@ -16,6 +16,7 @@ public class Exam implements Serializable {
     private String courseId;
     private String title;
     private String instructionsForStudents;
+    private String instructionsForTeacher;
     private List<Question> questions = new ArrayList<>();
     private int durationMinutes;
     private ExamStatus status = ExamStatus.DRAFT;
@@ -84,6 +85,15 @@ public class Exam implements Serializable {
 
     public void setInstructionsForStudents(String instructionsForStudents) {
         this.instructionsForStudents = instructionsForStudents;
+    }
+
+    /** SUC-3.2: internal notes only the teacher sees - never shown to students taking the exam. */
+    public String getInstructionsForTeacher() {
+        return instructionsForTeacher;
+    }
+
+    public void setInstructionsForTeacher(String instructionsForTeacher) {
+        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public List<Question> getQuestions() {

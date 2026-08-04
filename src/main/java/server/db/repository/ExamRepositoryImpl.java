@@ -57,8 +57,8 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
 
     @Override
     public boolean save(Exam exam) {
-        String sqlExam = "INSERT INTO exams (exam_id, course_id, title, instructions, duration_minutes, " +
-                "status, created_by_teacher_id, execution_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sqlExam = "INSERT INTO exams (exam_id, course_id, title, instructions, instructions_for_teacher, " +
+                "duration_minutes, status, created_by_teacher_id, execution_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         String sqlQuestions = "INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES (?, ?, ?)";
 
         Connection conn = dbManager.getConnection();
@@ -72,10 +72,11 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
                 stmt.setString(2, exam.getCourseId());
                 stmt.setString(3, exam.getTitle());
                 stmt.setString(4, exam.getInstructionsForStudents());
-                stmt.setInt(5, exam.getDurationMinutes());
-                stmt.setString(6, exam.getStatus().name());
-                stmt.setString(7, exam.getCreatedByTeacherId());
-                stmt.setString(8, exam.getExecutionCode());
+                stmt.setString(5, exam.getInstructionsForTeacher());
+                stmt.setInt(6, exam.getDurationMinutes());
+                stmt.setString(7, exam.getStatus().name());
+                stmt.setString(8, exam.getCreatedByTeacherId());
+                stmt.setString(9, exam.getExecutionCode());
                 stmt.executeUpdate();
             }
 
@@ -145,6 +146,7 @@ public class ExamRepositoryImpl implements Repository<Exam, String> {
         exam.setCourseId(rs.getString("course_id"));
         exam.setTitle(rs.getString("title"));
         exam.setInstructionsForStudents(rs.getString("instructions"));
+        exam.setInstructionsForTeacher(rs.getString("instructions_for_teacher"));
         exam.setDurationMinutes(rs.getInt("duration_minutes"));
         exam.setStatus(ExamStatus.valueOf(rs.getString("status")));
         exam.setCreatedByTeacherId(rs.getString("created_by_teacher_id"));

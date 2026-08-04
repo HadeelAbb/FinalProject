@@ -8,6 +8,7 @@ public class CreateExamManualData implements Serializable {
     private String courseId;
     private String title;
     private String instructionsForStudents;
+    private String instructionsForTeacher;
     private List<String> questionIds;
     private int durationMinutes;
 
@@ -15,7 +16,7 @@ public class CreateExamManualData implements Serializable {
     }
 
     public CreateExamManualData(String teacherId, String courseId, String title, String instructionsForStudents,
-                                 List<String> questionIds, int durationMinutes) {
+                                List<String> questionIds, int durationMinutes) {
         this.teacherId = teacherId;
         this.courseId = courseId;
         this.title = title;
@@ -54,6 +55,14 @@ public class CreateExamManualData implements Serializable {
 
     public void setInstructionsForStudents(String instructionsForStudents) {
         this.instructionsForStudents = instructionsForStudents;
+    }
+
+    public String getInstructionsForTeacher() {
+        return instructionsForTeacher;
+    }
+
+    public void setInstructionsForTeacher(String instructionsForTeacher) {
+        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public List<String> getQuestionIds() {

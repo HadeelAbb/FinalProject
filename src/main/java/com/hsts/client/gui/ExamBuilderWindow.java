@@ -42,6 +42,7 @@ public class ExamBuilderWindow {
     @FXML private ComboBox<Difficulty> autoDifficultySelector;
     @FXML private Spinner<Integer> autoCountSpinner;
     @FXML private TextArea instructionsField;
+    @FXML private TextArea teacherNotesField;
     @FXML private Button createButton;
     @FXML private Button submitForApprovalButton;
     @FXML private Label draftSummaryLabel;
@@ -55,7 +56,7 @@ public class ExamBuilderWindow {
     private LoginClientController navLoginController;
 
     public void init(ExamBuilderClientController controller, Teacher teacher,
-                      ServerConnection client, LoginClientController loginController) {
+                     ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.currentTeacher = teacher;
         this.navUser = teacher;
@@ -132,10 +133,10 @@ public class ExamBuilderWindow {
                 return;
             }
             controller.createManual(course.getId(), titleField.getText(), instructionsField.getText(),
-                    ids, durationSpinner.getValue());
+                    teacherNotesField.getText(), ids, durationSpinner.getValue());
         } else {
             controller.createAuto(course.getId(), titleField.getText(), instructionsField.getText(),
-                    autoTopicField.getText(), autoDifficultySelector.getValue(),
+                    teacherNotesField.getText(), autoTopicField.getText(), autoDifficultySelector.getValue(),
                     autoCountSpinner.getValue(), durationSpinner.getValue());
         }
     }

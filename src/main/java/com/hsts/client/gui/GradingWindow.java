@@ -40,7 +40,7 @@ public class GradingWindow {
     private LoginClientController navLoginController;
 
     public void init(GradingClientController controller, Teacher teacher,
-                      ServerConnection client, LoginClientController loginController) {
+                     ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.navUser = teacher;
         this.navClient = client;
@@ -117,9 +117,13 @@ public class GradingWindow {
             return;
         }
         boolean overriding = !finalScore.equals(selected.getAutoScore());
+        if (overriding && (commentField.getText() == null || commentField.getText().isBlank())) {
+            showError("Changing the score requires a comment explaining why.");
+            return;
+        }
         String message = overriding
                 ? "You're changing the score from " + selected.getAutoScore() + " to " + finalScore
-                    + ". This requires the comment you entered. Continue?"
+                  + " with comment: \"" + commentField.getText().trim() + "\". Continue?"
                 : "Confirm the automatic score of " + finalScore + " for this student?";
         if (!NavigationHelper.confirm(message)) {
             return;

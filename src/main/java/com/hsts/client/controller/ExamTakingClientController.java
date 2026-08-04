@@ -7,6 +7,8 @@ import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
 import com.hsts.shared.model.Student;
 import com.hsts.shared.net.Command;
+import com.hsts.shared.net.ExamEvent;
+import com.hsts.shared.net.EventType;
 import com.hsts.shared.net.Response;
 import com.hsts.shared.net.dto.GetAvailableExamsData;
 import com.hsts.shared.net.dto.StartExamData;
@@ -27,6 +29,7 @@ public class ExamTakingClientController implements ResponseHandler {
         client.registerHandler(Command.GET_AVAILABLE_EXAMS, this);
         client.registerHandler(Command.START_EXAM, this);
         client.registerHandler(Command.SUBMIT_EXAM, this);
+        client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void setCurrentStudent(Student student) {
@@ -57,6 +60,17 @@ public class ExamTakingClientController implements ResponseHandler {
     @Override
     public void handleResponse(Response response) {
         if (view == null) {
+            return;
+        }
+        // EXAM_EVENT is a server-initiated push, not a reply to something we sent -
+        // it can arrive at any time, including when there's nothing to do with it.
+        if (response.getCommand() == Command.EXAM_EVENT) {
+            if (response.getPayload() instanceof ExamEvent event
+                    && event.getType() == EventType.EXAM_TIME_EXTENDED
+                    && currentExam != null
+                    && currentExam.getExamId().equals(event.getExamId())) {
+                view.onTimeExtended(event.getExtraMinutes(), event.getMessage());
+            }
             return;
         }
         if (!response.isSuccess()) {

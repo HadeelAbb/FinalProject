@@ -17,6 +17,7 @@ public class ExamEvent implements Serializable {
     private String courseId;
     private String targetUserId;
     private String message;
+    private int extraMinutes;
 
     public ExamEvent() {
     }
@@ -27,6 +28,14 @@ public class ExamEvent implements Serializable {
         this.courseId = courseId;
         this.targetUserId = targetUserId;
         this.message = message;
+    }
+
+    public int getExtraMinutes() {
+        return extraMinutes;
+    }
+
+    public void setExtraMinutes(int extraMinutes) {
+        this.extraMinutes = extraMinutes;
     }
 
     public EventType getType() {
