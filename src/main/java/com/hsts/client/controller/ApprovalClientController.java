@@ -39,9 +39,11 @@ public class ApprovalClientController implements ResponseHandler {
         client.sendToServer(Command.GET_PENDING_APPROVAL_EXAMS, null);
     }
 
-    public void approve(String examId) {
-        client.sendToServer(Command.APPROVE_EXAM,
-                new ExamApprovalDecisionData(examId, currentCoordinator.getId(), null));
+    public void approve(String examId, String scheduledStart, String scheduledEnd) {
+        ExamApprovalDecisionData data = new ExamApprovalDecisionData(examId, currentCoordinator.getId(), null);
+        data.setScheduledStart(scheduledStart);
+        data.setScheduledEnd(scheduledEnd);
+        client.sendToServer(Command.APPROVE_EXAM, data);
     }
 
     public void reject(String examId, String reason) {

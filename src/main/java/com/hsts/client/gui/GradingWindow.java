@@ -140,12 +140,19 @@ public class GradingWindow {
 
     public void onGradeConfirmed(ExamAnswer answer) {
         confirmButton.setDisable(false);
-        statusLabel.setText("Grade confirmed for " + answer.getStudentId() + ": " + answer.getFinalScore());
+        String message = "Grade confirmed for " + answer.getStudentId() + ": " + answer.getFinalScore();
+        statusLabel.setText(message);
         detailsLabel.setText("");
         autoScoreLabel.setText("");
         finalScoreField.clear();
         commentField.clear();
         answersView.getItems().clear();
+
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+        alert.setTitle("Grade confirmed");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
     public void showError(String message) {

@@ -11,6 +11,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 
 public class ApprovalWindow {
 
@@ -20,6 +21,8 @@ public class ApprovalWindow {
     @FXML private ListView<String> questionsPreview;
     @FXML private Label examDetailsLabel;
     @FXML private TextArea reasonField;
+    @FXML private TextField startDateField;
+    @FXML private TextField endDateField;
     @FXML private Button approveButton;
     @FXML private Button rejectButton;
     @FXML private Label statusLabel;
@@ -82,11 +85,34 @@ public class ApprovalWindow {
             showError("Select an exam first.");
             return;
         }
-        if (!NavigationHelper.confirm("Approve \"" + selected.getTitle() + "\"? Students will be able to take it once approved.")) {
+        String start = startDateField.getText() != null ? startDateField.getText().trim() : "";
+        String end = endDateField.getText() != null ? endDateField.getText().trim() : "";
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        if (!start.isEmpty()) {
+            try {
+                java.time.LocalDateTime.parse(start, fmt);
+            } catch (Exception e) {
+                showError("Open date must be in the format yyyy-MM-dd HH:mm, e.g. 2026-08-10 09:00");
+                return;
+            }
+        }
+        if (!end.isEmpty()) {
+            try {
+                java.time.LocalDateTime.parse(end, fmt);
+            } catch (Exception e) {
+                showError("Close date must be in the format yyyy-MM-dd HH:mm, e.g. 2026-08-17 23:59");
+                return;
+            }
+        }
+        String windowNote = (!start.isEmpty() || !end.isEmpty())
+                ? " Open " + (start.isEmpty() ? "(default)" : start) + " - close " + (end.isEmpty() ? "(default, +14 days)" : end) + "."
+                : " Using the default open/close window (now through +14 days).";
+        if (!NavigationHelper.confirm("Approve \"" + selected.getTitle() + "\"? Students will be able to take it once approved."
+                + windowNote)) {
             return;
         }
         setButtonsDisabled(true);
-        controller.approve(selected.getExamId());
+        controller.approve(selected.getExamId(), start.isEmpty() ? null : start, end.isEmpty() ? null : end);
     }
 
     @FXML
@@ -136,8 +162,13 @@ public class ApprovalWindow {
 
     public void onDecisionMade(Exam exam, String message) {
         setButtonsDisabled(false);
-        statusLabel.setText(message + " (" + exam.getExamId() + ")");
+        String codeNote = exam.getExecutionCode() != null
+                ? " - execution code: " + exam.getExecutionCode()
+                : "";
+        statusLabel.setText(message + " (" + exam.getExamId() + ")" + codeNote);
         reasonField.clear();
+        startDateField.clear();
+        endDateField.clear();
         controller.refreshPending();
     }
 

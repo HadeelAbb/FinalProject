@@ -10,6 +10,9 @@ public class ExamApprovalDecisionData implements Serializable {
     private String examId;
     private String coordinatorId;
     private String reason;
+    /** Format: yyyy-MM-dd HH:mm. Only used on approval, ignored on rejection. */
+    private String scheduledStart;
+    private String scheduledEnd;
 
     public ExamApprovalDecisionData() {
     }
@@ -18,6 +21,22 @@ public class ExamApprovalDecisionData implements Serializable {
         this.examId = examId;
         this.coordinatorId = coordinatorId;
         this.reason = reason;
+    }
+
+    public String getScheduledStart() {
+        return scheduledStart;
+    }
+
+    public void setScheduledStart(String scheduledStart) {
+        this.scheduledStart = scheduledStart;
+    }
+
+    public String getScheduledEnd() {
+        return scheduledEnd;
+    }
+
+    public void setScheduledEnd(String scheduledEnd) {
+        this.scheduledEnd = scheduledEnd;
     }
 
     public String getExamId() {

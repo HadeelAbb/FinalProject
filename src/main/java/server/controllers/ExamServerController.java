@@ -52,19 +52,45 @@ public class ExamServerController {
         return examRepository.save(exam) ? exam : null;
     }
 
-    // SUC-4: Exam Approval
+    // Backward-compatible overload for older callers (e.g. ExamBuildTestDriver)
+    // that don't supply dates - just uses the default window.
     public Exam approveExam(String examId, String coordinatorId) {
+        return approveExam(examId, coordinatorId, null, null);
+    }
+
+    // SUC-4 / SUC-3.5: Exam Approval - coordinator sets the open/close window here;
+    // an unapproved exam can never have dates (enforced by dates only ever being set
+    // in this one path). Falls back to a default 14-day window if the coordinator
+    // left the fields blank, rather than rejecting the approval outright.
+    public Exam approveExam(String examId, String coordinatorId, String scheduledStartText, String scheduledEndText) {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isPresent()) {
             Exam exam = opt.get();
             exam.setStatus(ExamStatus.APPROVED);
             exam.setApprovedByCoordinatorId(coordinatorId);
-            exam.setScheduledStart(LocalDateTime.now());
-            exam.setScheduledEnd(LocalDateTime.now().plusDays(14)); // Scheduled active window
+
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            LocalDateTime start = parseOrDefault(scheduledStartText, fmt, LocalDateTime.now());
+            LocalDateTime end = parseOrDefault(scheduledEndText, fmt, start.plusDays(14));
+            exam.setScheduledStart(start);
+            exam.setScheduledEnd(end);
+
             exam.setExecutionCode(generateExecutionCode());
             return examRepository.update(exam) ? exam : null;
         }
         return null;
+    }
+
+    private LocalDateTime parseOrDefault(String text, java.time.format.DateTimeFormatter fmt, LocalDateTime fallback) {
+        if (text == null || text.isBlank()) {
+            return fallback;
+        }
+        try {
+            return LocalDateTime.parse(text.trim(), fmt);
+        } catch (Exception e) {
+            System.err.println("Could not parse date '" + text + "' (expected yyyy-MM-dd HH:mm) - using default instead.");
+            return fallback;
+        }
     }
 
     // SUC-4: Exam Rejection

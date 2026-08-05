@@ -515,7 +515,8 @@ public class MainServerApp {
             boolean isApproved = data.getReason() == null || data.getReason().isBlank();
 
             if (isApproved) {
-                resultExam = examServerController.approveExam(data.getExamId(), data.getCoordinatorId());
+                resultExam = examServerController.approveExam(data.getExamId(), data.getCoordinatorId(),
+                        data.getScheduledStart(), data.getScheduledEnd());
             } else {
                 resultExam = examServerController.rejectExam(
                         data.getExamId(),
