@@ -11,16 +11,15 @@ import java.util.Properties;
 
 /**
  * SUC-14: Study Bot - sends a student's question to a real external AI API
- * (Google Gemini, free tier) and returns the answer, per the spec's
- * requirement to use an existing bot/API rather than build one. Reads the
- * key from config.properties (same gitignored file used for the DB
- * password) under "gemini.api.key".
+ * (Groq, free tier - broadly available, OpenAI-compatible format) and
+ * returns the answer, per the spec's requirement to use an existing bot/API
+ * rather than build one. Reads the key from config.properties (same
+ * gitignored file used for the DB password) under "groq.api.key".
  */
 public class BotApiClient {
 
-    private static final String MODEL = "gemini-2.0-flash";
-    private static final String API_URL_BASE =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=";
+    private static final String API_URL = "https://api.groq.com/openai/v1/chat/completions";
+    private static final String MODEL = "llama-3.3-70b-versatile";
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -35,7 +34,7 @@ public class BotApiClient {
         try (InputStream in = getClass().getClassLoader().getResourceAsStream("config.properties")) {
             if (in != null) {
                 props.load(in);
-                String key = props.getProperty("gemini.api.key");
+                String key = props.getProperty("groq.api.key");
                 if (key != null && !key.isBlank()) {
                     return key.trim();
                 }
@@ -43,7 +42,7 @@ public class BotApiClient {
         } catch (IOException e) {
             System.err.println("[BOT] Could not read config.properties: " + e.getMessage());
         }
-        System.err.println("[BOT] No gemini.api.key found in config.properties - bot will use fallback answers.");
+        System.err.println("[BOT] No groq.api.key found in config.properties - bot will use fallback answers.");
         return null;
     }
 
@@ -57,18 +56,23 @@ public class BotApiClient {
             return null;
         }
         try {
-            String prompt = "You are a study assistant helping a high school student with their coursework"
-                    + (courseContext != null ? " for course " + courseContext : "") + ". "
-                    + "Answer clearly and concisely, in a way appropriate for a student. "
-                    + "If the question is unrelated to schoolwork, politely redirect them to ask something study-related.\n\n"
-                    + "Student's question: " + studentQuestion;
+            String systemPrompt = "You are a study assistant helping a high school student with their "
+                    + "coursework" + (courseContext != null ? " for course " + courseContext : "")
+                    + ". Answer clearly and concisely, in a way appropriate for a student. "
+                    + "If the question is unrelated to schoolwork, politely redirect them to ask something study-related.";
 
             String body = "{"
-                    + "\"contents\":[{\"parts\":[{\"text\":" + jsonString(prompt) + "}]}]"
+                    + "\"model\":\"" + MODEL + "\","
+                    + "\"messages\":["
+                    + "{\"role\":\"system\",\"content\":" + jsonString(systemPrompt) + "},"
+                    + "{\"role\":\"user\",\"content\":" + jsonString(studentQuestion) + "}"
+                    + "],"
+                    + "\"max_tokens\":500"
                     + "}";
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(API_URL_BASE + apiKey))
+                    .uri(URI.create(API_URL))
+                    .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(20))
                     .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -81,7 +85,7 @@ public class BotApiClient {
                 return null;
             }
 
-            return extractText(response.body());
+            return extractContent(response.body());
         } catch (Exception e) {
             System.err.println("[BOT] API call failed: " + e.getMessage());
             return null;
@@ -110,15 +114,12 @@ public class BotApiClient {
         return sb.append("\"").toString();
     }
 
-    /**
-     * Minimal hand-rolled extraction of candidates[0].content.parts[0].text
-     * from Gemini's response JSON - avoids a JSON library for one field.
-     */
-    private String extractText(String responseBody) {
+    /** Minimal hand-rolled extraction of choices[0].message.content - avoids a JSON library for one field. */
+    private String extractContent(String responseBody) {
         try {
-            int textKey = responseBody.indexOf("\"text\"");
-            if (textKey == -1) return null;
-            int colon = responseBody.indexOf(':', textKey);
+            int contentKey = responseBody.indexOf("\"content\"");
+            if (contentKey == -1) return null;
+            int colon = responseBody.indexOf(':', contentKey);
             int firstQuote = responseBody.indexOf('"', colon + 1);
             StringBuilder result = new StringBuilder();
             int i = firstQuote + 1;

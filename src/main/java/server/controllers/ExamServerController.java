@@ -120,6 +120,12 @@ public class ExamServerController {
             return null;
         }
 
+        // 1b. SUC 6.2: student must be enrolled in the exam's course
+        if (!isStudentEnrolled(data.getStudentId(), exam.getCourseId())) {
+            System.err.println("Start rejected: Student " + data.getStudentId() + " is not enrolled in course " + exam.getCourseId());
+            return null;
+        }
+
         // 2. Validate 4-character execution code (case-insensitive)
         if (exam.getExecutionCode() != null && !exam.getExecutionCode().equalsIgnoreCase(submittedExecutionCode)) {
             System.err.println("Start rejected: Invalid execution code provided for exam " + data.getExamId());
@@ -142,7 +148,15 @@ public class ExamServerController {
 
         Exam exam = optExam.get();
 
-        // 1. Check if student has already submitted this exam (Enforce 1 attempt per student)
+        // 1. SUC 6.2: enforced independently here too, not just at startExam - a
+        // submission shouldn't be accepted for a course the student was never
+        // actually enrolled in, regardless of how the request reached the server.
+        if (!isStudentEnrolled(data.getStudentId(), exam.getCourseId())) {
+            System.err.println("Submission rejected: Student " + data.getStudentId() + " is not enrolled in course " + exam.getCourseId());
+            return null;
+        }
+
+        // 2. Check if student has already submitted this exam (Enforce 1 attempt per student)
         if (hasStudentAlreadySubmitted(data.getStudentId(), data.getExamId())) {
             System.err.println("Submission rejected: Student " + data.getStudentId() + " has already taken exam " + data.getExamId());
             return null;
@@ -291,10 +305,7 @@ public class ExamServerController {
         return pending;
     }
 
-    // SUC-6: exams a student can currently take (approved, not already submitted).
-    // NOTE: the schema has no student-course enrollment table yet, so unlike the
-    // mock's stricter version, this does not filter by course enrollment - it
-    // shows every approved exam the student hasn't already answered.
+    // SUC-6: exams a student can currently take (approved, enrolled in the course, not already submitted).
     public List<Exam> getAvailableExams(String studentId) {
         List<Exam> all = examRepository.findAll();
         List<ExamAnswer> mineSoFar = answerRepository.findByStudentId(studentId);
@@ -303,12 +314,36 @@ public class ExamServerController {
             if (e.getStatus() != ExamStatus.APPROVED) {
                 continue;
             }
+            if (!isStudentEnrolled(studentId, e.getCourseId())) {
+                continue;
+            }
             boolean alreadyTaken = mineSoFar.stream().anyMatch(a -> a.getExamId().equals(e.getExamId()));
             if (!alreadyTaken) {
                 available.add(e);
             }
         }
         return available;
+    }
+
+    // SUC 6.2: whether a student is registered for a given course - now enforced
+    // for both exam availability and the study bot.
+    public boolean isStudentEnrolled(String studentId, String courseId) {
+        String sql = "SELECT COUNT(*) FROM student_courses WHERE student_id = ? AND course_id = ?";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return false;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, studentId);
+            stmt.setString(2, courseId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     // SUC-9: a teacher's grading queue - submitted answers not yet confirmed, for exams they created

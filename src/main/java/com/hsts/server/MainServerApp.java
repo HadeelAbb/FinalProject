@@ -88,7 +88,7 @@ public class MainServerApp {
         registerAuthRoutes(router, loginServerController);
         registerQuestionRoutes(router, questionServerController, server);
         registerExamRoutes(router, examServerController, eventBus);
-        registerBotRoutes(router, botRepository);
+        registerBotRoutes(router, botRepository, examServerController);
         configureSessionHandling(server, router, loginServerController, connectionRegistry);
 
         startServer(server);
@@ -177,6 +177,7 @@ public class MainServerApp {
                         student.setFirstName(firstName);
                         student.setLastName(lastName);
                         student.setRole("STUDENT");
+                        student.setCourses(loadStudentCoursesFromDatabase(username));
                         return student;
                     } else if ("COORDINATOR".equalsIgnoreCase(role) || "SUBJECT_COORDINATOR".equalsIgnoreCase(role)) {
                         com.hsts.shared.model.SubjectCoordinator coord = new com.hsts.shared.model.SubjectCoordinator();
@@ -246,6 +247,36 @@ public class MainServerApp {
             }
         } catch (SQLException e) {
             System.err.println("[SERVER-ERROR] Failed to fetch real courses from SQL:");
+            e.printStackTrace();
+        }
+
+        return courses;
+    }
+
+    // SUC 6.2: only the courses this specific student is actually enrolled in -
+    // used to populate their course dropdowns (bot chat, etc.) client-side.
+    private static List<Course> loadStudentCoursesFromDatabase(String studentId) {
+        List<Course> courses = new ArrayList<>();
+        Connection conn = DatabaseManager.getInstance().getConnection();
+
+        if (conn == null) {
+            System.err.println("[SERVER-ERROR] Cannot fetch student courses: database connection is null.");
+            return courses;
+        }
+
+        String sql = "SELECT c.course_id, c.name FROM courses c " +
+                "JOIN student_courses sc ON c.course_id = sc.course_id " +
+                "WHERE sc.student_id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, studentId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    courses.add(new Course(rs.getString("course_id"), rs.getString("name")));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[SERVER-ERROR] Failed to fetch student courses from SQL:");
             e.printStackTrace();
         }
 
@@ -670,11 +701,6 @@ public class MainServerApp {
                 return Response.failure(Command.EXTEND_EXAM_TIME,
                         "Could not extend time - check that you created this exam.", request.getRequestId());
             }
-            // Spec: this is temporary and applies only to the current execution - so we
-            // push a live event to whoever is currently taking this exam, instead of
-            // persisting a duration change to the exam's base definition. Broadcast (no
-            // targetUserId) since the server has no record of exactly which students are
-            // mid-exam right now - each client filters locally by matching examId.
             ExamEvent event = new ExamEvent(EventType.EXAM_TIME_EXTENDED, exam.getExamId(),
                     exam.getCourseId(), null,
                     "Your teacher extended this exam's time by " + data.getAdditionalMinutes() + " minutes.");
@@ -685,7 +711,6 @@ public class MainServerApp {
                     request.getRequestId());
         });
 
-        // SUC 7.3.1: Principal's read-only access - no filtering by teacher/course/status
         router.registerHandler(Command.GET_ALL_EXAMS, request -> {
             List<Exam> all = examServerController.getAllExams();
             return Response.success(Command.GET_ALL_EXAMS, all, null, request.getRequestId());
@@ -696,7 +721,6 @@ public class MainServerApp {
             return Response.success(Command.GET_ALL_RESULTS, all, null, request.getRequestId());
         });
 
-        // SUC 5 / 7.2 / 7.3.2: mean/median/decile stats for one exam
         router.registerHandler(Command.GET_EXAM_STATS, request -> {
             GetExamStatsData data = (GetExamStatsData) request.getPayload();
             Optional<ExamStats> stats = examServerController.getExamStats(data.getExamId());
@@ -714,25 +738,27 @@ public class MainServerApp {
     // =========================================================================
 
     private static void registerBotRoutes(ServerRequestRouter router,
-                                          BotRepositoryImpl botRepository) {
+                                          BotRepositoryImpl botRepository,
+                                          ExamServerController examServerController) {
         server.controllers.BotApiClient botApiClient = new server.controllers.BotApiClient();
 
         router.registerHandler(Command.ASK_BOT_QUESTION, request -> {
             try {
-                if (request.getPayload() instanceof BotInteraction incoming) {
-                    if (isBlank(incoming.getInteractionId())) {
-                        incoming.setInteractionId("BOT-" + UUID.randomUUID().toString().substring(0, 8));
+                if (request.getPayload() instanceof com.hsts.shared.net.dto.AskBotQuestionData data) {
+                    if (!examServerController.isStudentEnrolled(data.getStudentId(), data.getCourseId())) {
+                        return Response.failure(Command.ASK_BOT_QUESTION,
+                                "You're not registered for that course, so the study bot isn't available to you for it.",
+                                request.getRequestId());
                     }
 
-                    if (isBlank(incoming.getAnswer())) {
-                        String realAnswer = botApiClient.ask(incoming.getQuestion(), incoming.getCourseId());
-                        if (realAnswer != null) {
-                            incoming.setAnswer(realAnswer);
-                        } else {
-                            incoming.setAnswer("Sorry, I couldn't come up with a good answer to that right now. "
-                                    + "Please try rephrasing your question, or check with your instructor.");
-                        }
-                    }
+                    String interactionId = "BOT-" + UUID.randomUUID().toString().substring(0, 8);
+                    String realAnswer = botApiClient.ask(data.getQuestion(), data.getCourseId());
+                    String finalAnswer = realAnswer != null ? realAnswer
+                            : "Sorry, I couldn't come up with a good answer to that right now. "
+                              + "Please try rephrasing your question, or check with your instructor.";
+
+                    BotInteraction incoming = new BotInteraction(interactionId, data.getStudentId(),
+                            data.getCourseId(), data.getQuestion(), finalAnswer);
 
                     botRepository.save(incoming);
 
@@ -764,8 +790,8 @@ public class MainServerApp {
 
         router.registerHandler(Command.GET_BOT_HISTORY, request -> {
             try {
-                if (request.getPayload() instanceof String studentId) {
-                    List<BotInteraction> history = botRepository.findByStudentId(studentId);
+                if (request.getPayload() instanceof com.hsts.shared.net.dto.GetBotHistoryData historyData) {
+                    List<BotInteraction> history = botRepository.findByStudentId(historyData.getStudentId());
                     return Response.success(
                             Command.GET_BOT_HISTORY,
                             history,
@@ -776,7 +802,7 @@ public class MainServerApp {
 
                 return Response.failure(
                         Command.GET_BOT_HISTORY,
-                        "Student ID must be a String.",
+                        "Invalid payload for GET_BOT_HISTORY.",
                         request.getRequestId()
                 );
             } catch (Exception e) {
@@ -788,11 +814,6 @@ public class MainServerApp {
             }
         });
 
-        // NOTE: the schema has no teacher-course assignment table, so unlike
-        // the mock (which scopes this to the requesting teacher's own
-        // courses), this aggregates bot usage across every course that has
-        // any activity at all. Anonymized either way - never shows which
-        // student asked what, only per-course totals.
         router.registerHandler(Command.GET_BOT_USAGE_STATS, request -> {
             try {
                 List<BotInteraction> all = botRepository.findAll();

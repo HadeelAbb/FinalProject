@@ -11,8 +11,8 @@ public class BotRepositoryImpl {
 
     public void save(BotInteraction interaction) throws SQLException {
         String sql = "INSERT INTO bot_interactions (interaction_id, student_id, course_id, user_question, bot_response) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseManager.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, interaction.getInteractionId());
             stmt.setString(2, interaction.getStudentId());
             stmt.setString(3, interaction.getCourseId());
@@ -25,8 +25,8 @@ public class BotRepositoryImpl {
     public List<BotInteraction> findByStudentId(String studentId) throws SQLException {
         List<BotInteraction> history = new ArrayList<>();
         String sql = "SELECT * FROM bot_interactions WHERE student_id = ? ORDER BY timestamp DESC";
-        try (Connection conn = DatabaseManager.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, studentId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -48,8 +48,8 @@ public class BotRepositoryImpl {
     public List<BotInteraction> findAll() throws SQLException {
         List<BotInteraction> all = new ArrayList<>();
         String sql = "SELECT * FROM bot_interactions";
-        try (Connection conn = DatabaseManager.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        Connection conn = DatabaseManager.getInstance().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     all.add(new BotInteraction(
