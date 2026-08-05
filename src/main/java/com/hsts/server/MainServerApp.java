@@ -715,6 +715,8 @@ public class MainServerApp {
 
     private static void registerBotRoutes(ServerRequestRouter router,
                                           BotRepositoryImpl botRepository) {
+        server.controllers.BotApiClient botApiClient = new server.controllers.BotApiClient();
+
         router.registerHandler(Command.ASK_BOT_QUESTION, request -> {
             try {
                 if (request.getPayload() instanceof BotInteraction incoming) {
@@ -723,9 +725,13 @@ public class MainServerApp {
                     }
 
                     if (isBlank(incoming.getAnswer())) {
-                        incoming.setAnswer("Automated Assistant: I received your question regarding course "
-                                + incoming.getCourseId()
-                                + ". Please review course materials or consult your instructor!");
+                        String realAnswer = botApiClient.ask(incoming.getQuestion(), incoming.getCourseId());
+                        if (realAnswer != null) {
+                            incoming.setAnswer(realAnswer);
+                        } else {
+                            incoming.setAnswer("Sorry, I couldn't come up with a good answer to that right now. "
+                                    + "Please try rephrasing your question, or check with your instructor.");
+                        }
                     }
 
                     botRepository.save(incoming);
