@@ -8,9 +8,11 @@ import com.hsts.client.controller.ExamTakingClientController;
 import com.hsts.client.controller.ExamTimeClientController;
 import com.hsts.client.controller.GradingClientController;
 import com.hsts.client.controller.LoginClientController;
+import com.hsts.client.controller.PrincipalClientController;
 import com.hsts.client.controller.QuestionClientController;
 import com.hsts.client.controller.ResultsClientController;
 import com.hsts.client.network.ServerConnection;
+import com.hsts.shared.model.Principal;
 import com.hsts.shared.model.Student;
 import com.hsts.shared.model.SubjectCoordinator;
 import com.hsts.shared.model.Teacher;
@@ -26,15 +28,6 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 
-/**
- * Landing screen after login (SUC-9). Shows only the actions relevant to
- * the logged-in user's role, then hands off to the corresponding screen -
- * same pattern LoginWindow already used for QuestionManagementWindow.
- *
- * Every downstream screen gets (user, client, loginController) passed
- * through its init() so it can call back into NavigationHelper for its
- * own Back/Logout buttons without needing to reconstruct any of this.
- */
 public class DashboardWindow {
 
     @FXML private Label welcomeLabel;
@@ -49,6 +42,7 @@ public class DashboardWindow {
     @FXML private Button extendTimeButton;
     @FXML private Button botStatsButton;
     @FXML private Button botChatButton;
+    @FXML private Button principalOverviewButton;
 
     private User user;
     private ServerConnection client;
@@ -65,6 +59,7 @@ public class DashboardWindow {
         boolean isCoordinator = user instanceof SubjectCoordinator;
         boolean isTeacher = user instanceof Teacher;
         boolean isStudent = user instanceof Student;
+        boolean isPrincipal = user instanceof Principal;
 
         questionsButton.setVisible(isTeacher);
         questionsButton.setManaged(isTeacher);
@@ -84,6 +79,8 @@ public class DashboardWindow {
         botStatsButton.setManaged(isTeacher);
         botChatButton.setVisible(isStudent);
         botChatButton.setManaged(isStudent);
+        principalOverviewButton.setVisible(isPrincipal);
+        principalOverviewButton.setManaged(isPrincipal);
     }
 
     @FXML
@@ -220,6 +217,20 @@ public class DashboardWindow {
             switchScene(root, "HSTS - Study Bot");
         } catch (IOException e) {
             showError("Could not open study bot screen.");
+        }
+    }
+
+    @FXML
+    void handlePrincipalOverview(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/principal_overview.fxml"));
+            Parent root = loader.load();
+            PrincipalOverviewWindow pow = loader.getController();
+            PrincipalClientController controller = new PrincipalClientController(client);
+            pow.init(controller, (Principal) user, client, loginController);
+            switchScene(root, "HSTS - Principal Overview");
+        } catch (IOException e) {
+            showError("Could not open principal overview screen.");
         }
     }
 

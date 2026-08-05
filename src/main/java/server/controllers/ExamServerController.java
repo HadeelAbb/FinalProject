@@ -238,6 +238,21 @@ public class ExamServerController {
         return mine;
     }
 
+    // SUC 7.3.1: every exam, any status, any teacher - Principal's read-only view
+    public List<Exam> getAllExams() {
+        return examRepository.findAll();
+    }
+
+    // SUC 7.3.1: every confirmed result, any student - Principal's read-only view
+    public List<ExamAnswer> getAllResults() {
+        return answerRepository.findAllConfirmed();
+    }
+
+    // SUC 5 / 7.2 / 7.3.2: statistical metrics (mean/median/decile distribution) for one exam
+    public Optional<ExamStats> getExamStats(String examId) {
+        return answerRepository.getExamStats(examId);
+    }
+
     // SUC-4: exams currently waiting on a coordinator's decision
     public List<Exam> getPendingApprovalExams() {
         List<Exam> all = examRepository.findAll();

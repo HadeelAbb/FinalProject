@@ -60,6 +60,13 @@
                         maxWidth="Infinity" styleClass="action-button"/>
             </VBox>
 
+            <VBox spacing="8">
+                <Label text="Principal" styleClass="section-label"/>
+                <Separator/>
+                <Button fx:id="principalOverviewButton" onAction="#handlePrincipalOverview" text="View all exams and results"
+                        maxWidth="Infinity" styleClass="action-button"/>
+            </VBox>
+
             <Label fx:id="errorLabel" styleClass="status-error"/>
         </VBox>
     </center>

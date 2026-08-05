@@ -208,6 +208,7 @@ public class ExamAnswerRepositoryImpl {
 
         return Optional.of(new ExamStats(examId, total, mean, median, deciles));
     }
+
     /** All answers a student has submitted (used for "already taken" checks and SUC-10 results). */
     public List<ExamAnswer> findByStudentId(String studentId) {
         List<String> ids = new ArrayList<>();
@@ -248,6 +249,31 @@ public class ExamAnswerRepositoryImpl {
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, teacherId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getString("exam_answer_id"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+
+        List<ExamAnswer> results = new ArrayList<>();
+        for (String id : ids) {
+            findById(id).ifPresent(results::add);
+        }
+        return results;
+    }
+
+    /** All confirmed results across every student and exam - for the Principal's read-only view (SUC 7.3.1). */
+    public List<ExamAnswer> findAllConfirmed() {
+        List<String> ids = new ArrayList<>();
+        String sql = "SELECT exam_answer_id FROM exam_answers WHERE grade_confirmed = 1";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return new ArrayList<>();
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     ids.add(rs.getString("exam_answer_id"));

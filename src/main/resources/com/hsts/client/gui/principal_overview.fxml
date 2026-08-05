@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.PrincipalOverviewWindow"
+            styleClass="body-pane" stylesheets="@app.css">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+            <Label text="Principal overview - read only" styleClass="top-bar-title" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+            <Button fx:id="backButton" onAction="#handleBack" text="Back to Dashboard" styleClass="nav-button"/>
+            <Button fx:id="logoutButton" onAction="#handleLogout" text="Log out" styleClass="nav-button"/>
+        </HBox>
+    </top>
+
+    <center>
+        <HBox spacing="12" style="-fx-padding: 10;">
+            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                <Label text="All exams (any status, any teacher) - select one to see its statistics:"/>
+                <ListView fx:id="allExamsView" prefHeight="380"/>
+                <Label fx:id="statsLabel" wrapText="true" style="-fx-font-weight: bold; -fx-padding: 6 0 0 0;"/>
+            </VBox>
+            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                <Label text="All confirmed results (any student):"/>
+                <ListView fx:id="allResultsView" prefHeight="480"/>
+            </VBox>
+        </HBox>
+    </center>
+
+    <bottom>
+        <Label fx:id="errorLabel" styleClass="status-error" style="-fx-padding: 6 10 10 10;"/>
+    </bottom>
+
+</BorderPane>

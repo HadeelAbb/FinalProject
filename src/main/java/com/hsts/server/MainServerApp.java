@@ -12,8 +12,10 @@ import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.model.ExamStats;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.QuestionAnswer;
+import com.hsts.shared.model.Principal;
 import com.hsts.shared.model.Teacher;
 import com.hsts.shared.model.User;
 import com.hsts.shared.net.Command;
@@ -30,6 +32,7 @@ import com.hsts.shared.net.dto.ExtendExamTimeData;
 import com.hsts.shared.net.dto.GetAvailableExamsData;
 import com.hsts.shared.net.dto.GetExamAnswerCopyData;
 import com.hsts.shared.net.dto.GetExamDetailData;
+import com.hsts.shared.net.dto.GetExamStatsData;
 import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.GetMyResultsData;
 import com.hsts.shared.net.dto.GetPendingGradingData;
@@ -52,19 +55,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Production Central Entry Point for the HSTS Backend.
- *
- * This version keeps the working P2 networking/session infrastructure:
- * - ConnectionRegistry
- * - targeted user connection tracking
- * - LOGOUT cleanup
- * - disconnect cleanup
- *
- * It also restores the old exam and bot routes from the previous MainServerApp.
- */
 public class MainServerApp {
 
     private static final int PORT = 3000;
@@ -192,6 +185,13 @@ public class MainServerApp {
                         coord.setLastName(lastName);
                         coord.setRole("SUBJECT_COORDINATOR");
                         return coord;
+                    } else if ("PRINCIPAL".equalsIgnoreCase(role)) {
+                        Principal principal = new Principal();
+                        principal.setId(username);
+                        principal.setFirstName(firstName);
+                        principal.setLastName(lastName);
+                        principal.setRole("PRINCIPAL");
+                        return principal;
                     } else {
                         Teacher teacher = new Teacher();
                         teacher.setId(username);
@@ -682,6 +682,29 @@ public class MainServerApp {
             return Response.success(Command.EXTEND_EXAM_TIME, exam,
                     "Time extended by " + data.getAdditionalMinutes() + " minutes for students currently taking this exam.",
                     request.getRequestId());
+        });
+
+        // SUC 7.3.1: Principal's read-only access - no filtering by teacher/course/status
+        router.registerHandler(Command.GET_ALL_EXAMS, request -> {
+            List<Exam> all = examServerController.getAllExams();
+            return Response.success(Command.GET_ALL_EXAMS, all, null, request.getRequestId());
+        });
+
+        router.registerHandler(Command.GET_ALL_RESULTS, request -> {
+            List<ExamAnswer> all = examServerController.getAllResults();
+            return Response.success(Command.GET_ALL_RESULTS, all, null, request.getRequestId());
+        });
+
+        // SUC 5 / 7.2 / 7.3.2: mean/median/decile stats for one exam
+        router.registerHandler(Command.GET_EXAM_STATS, request -> {
+            GetExamStatsData data = (GetExamStatsData) request.getPayload();
+            Optional<ExamStats> stats = examServerController.getExamStats(data.getExamId());
+            if (stats.isEmpty()) {
+                return Response.failure(Command.GET_EXAM_STATS,
+                        "No confirmed grades yet for this exam - statistics aren't available until at least one grade is confirmed.",
+                        request.getRequestId());
+            }
+            return Response.success(Command.GET_EXAM_STATS, stats.get(), null, request.getRequestId());
         });
     }
 

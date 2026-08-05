@@ -51,5 +51,10 @@ public enum Command {
     // affects other connected clients (e.g. a coordinator approves an
     // exam -> the teacher's screen should update; a teacher extends time
     // -> the student's screen should update). Payload is an ExamEvent.
-    EXAM_EVENT
+    EXAM_EVENT,
+
+    // ===== School Principal - read-only access (SUC 7.3) =====
+    GET_ALL_EXAMS,
+    GET_ALL_RESULTS,
+    GET_EXAM_STATS
 }
