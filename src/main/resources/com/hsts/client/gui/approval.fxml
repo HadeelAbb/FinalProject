@@ -4,7 +4,6 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -35,12 +34,6 @@
 
             <Label text="Rejection reason (required if rejecting):"/>
             <TextArea fx:id="reasonField" prefHeight="60" wrapText="true"/>
-
-            <Label text="Open date/time for approval (optional - format yyyy-MM-dd HH:mm, leave blank for now):"/>
-            <TextField fx:id="startDateField" promptText="e.g. 2026-08-10 09:00"/>
-
-            <Label text="Close date/time for approval (optional - leave blank for +14 days):"/>
-            <TextField fx:id="endDateField" promptText="e.g. 2026-08-17 23:59"/>
 
             <HBox spacing="8">
                 <Button fx:id="approveButton" onAction="#handleApprove" text="Approve" styleClass="primary-button"/>

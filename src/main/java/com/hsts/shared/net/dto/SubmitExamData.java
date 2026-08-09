@@ -7,6 +7,7 @@ import java.util.Map;
 public class SubmitExamData implements Serializable {
     private String examId;
     private String studentId;
+    private String executionCode;
     /** questionId -> selected answer text. */
     private Map<String, String> selectedAnswers = new HashMap<>();
     private boolean autoSubmitted;
@@ -15,11 +16,19 @@ public class SubmitExamData implements Serializable {
     }
 
     public SubmitExamData(String examId, String studentId, Map<String, String> selectedAnswers,
-                           boolean autoSubmitted) {
+                          boolean autoSubmitted) {
         this.examId = examId;
         this.studentId = studentId;
         this.selectedAnswers = selectedAnswers != null ? selectedAnswers : new HashMap<>();
         this.autoSubmitted = autoSubmitted;
+    }
+
+    public String getExecutionCode() {
+        return executionCode;
+    }
+
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 
     public String getExamId() {

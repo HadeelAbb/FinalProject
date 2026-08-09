@@ -41,6 +41,7 @@ DROP TABLE IF EXISTS exam_questions;
 DROP TABLE IF EXISTS question_answers;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS exams;
+DROP TABLE IF EXISTS exam_executions;
 DROP TABLE IF EXISTS student_courses;
 DROP TABLE IF EXISTS courses;
 DROP TABLE IF EXISTS users;
@@ -187,9 +188,22 @@ INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES
 -- --------------------------------------------------------
 -- 7. Table Structure: exam_answers
 -- --------------------------------------------------------
+CREATE TABLE exam_executions (
+                                 execution_id VARCHAR(20) PRIMARY KEY,
+                                 exam_id VARCHAR(10) NOT NULL,
+                                 execution_code VARCHAR(4) NOT NULL,
+                                 scheduled_start DATETIME,
+                                 scheduled_end DATETIME,
+                                 extra_minutes_granted INT DEFAULT 0,
+                                 created_by_teacher_id VARCHAR(50) NOT NULL,
+                                 FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
+                                 FOREIGN KEY (created_by_teacher_id) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE exam_answers (
                               exam_answer_id VARCHAR(20) PRIMARY KEY,
                               exam_id VARCHAR(10) NOT NULL,
+                              execution_id VARCHAR(20),
                               student_id VARCHAR(50) NOT NULL,
                               auto_score DOUBLE DEFAULT 0.0,
                               final_score DOUBLE DEFAULT 0.0,
@@ -198,6 +212,7 @@ CREATE TABLE exam_answers (
                               submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                               auto_submitted TINYINT(1) DEFAULT 0,
                               FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
+                              FOREIGN KEY (execution_id) REFERENCES exam_executions(execution_id) ON DELETE SET NULL,
                               FOREIGN KEY (student_id) REFERENCES users(username) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

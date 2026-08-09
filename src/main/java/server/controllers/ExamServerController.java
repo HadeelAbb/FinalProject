@@ -19,6 +19,7 @@ public class ExamServerController {
 
     private final ExamRepositoryImpl examRepository = new ExamRepositoryImpl();
     private final ExamAnswerRepositoryImpl answerRepository = new ExamAnswerRepositoryImpl();
+    private final server.db.repository.ExamExecutionRepositoryImpl executionRepository = new server.db.repository.ExamExecutionRepositoryImpl();
     private final DatabaseManager dbManager = DatabaseManager.getInstance();
 
     // SUC-2: Manual Exam Creation
@@ -52,30 +53,17 @@ public class ExamServerController {
         return examRepository.save(exam) ? exam : null;
     }
 
-    // Backward-compatible overload for older callers (e.g. ExamBuildTestDriver)
-    // that don't supply dates - just uses the default window.
+    // SUC-4 / SUC-3.5: Exam Approval - marks the exam eligible to be performed.
+    // Per the spec (3.4/4/2.2): approval itself does NOT create an execution -
+    // "taking the exam out of the drawer" is a distinct, separately-repeatable
+    // teacher action (see createExecution below). A teacher must explicitly
+    // open at least one execution before any student can take this exam.
     public Exam approveExam(String examId, String coordinatorId) {
-        return approveExam(examId, coordinatorId, null, null);
-    }
-
-    // SUC-4 / SUC-3.5: Exam Approval - coordinator sets the open/close window here;
-    // an unapproved exam can never have dates (enforced by dates only ever being set
-    // in this one path). Falls back to a default 14-day window if the coordinator
-    // left the fields blank, rather than rejecting the approval outright.
-    public Exam approveExam(String examId, String coordinatorId, String scheduledStartText, String scheduledEndText) {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isPresent()) {
             Exam exam = opt.get();
             exam.setStatus(ExamStatus.APPROVED);
             exam.setApprovedByCoordinatorId(coordinatorId);
-
-            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-            LocalDateTime start = parseOrDefault(scheduledStartText, fmt, LocalDateTime.now());
-            LocalDateTime end = parseOrDefault(scheduledEndText, fmt, start.plusDays(14));
-            exam.setScheduledStart(start);
-            exam.setScheduledEnd(end);
-
-            exam.setExecutionCode(generateExecutionCode());
             return examRepository.update(exam) ? exam : null;
         }
         return null;
@@ -126,9 +114,22 @@ public class ExamServerController {
             return null;
         }
 
-        // 2. Validate 4-character execution code (case-insensitive)
-        if (exam.getExecutionCode() != null && !exam.getExecutionCode().equalsIgnoreCase(submittedExecutionCode)) {
+        // 2. SUC 2.2: resolve which execution this code belongs to (an exam can have
+        // several executions over time, each with its own code and window).
+        Optional<com.hsts.shared.model.ExamExecution> executionOpt =
+                executionRepository.findByExamIdAndCode(data.getExamId(), submittedExecutionCode);
+        if (executionOpt.isEmpty()) {
             System.err.println("Start rejected: Invalid execution code provided for exam " + data.getExamId());
+            return null;
+        }
+        com.hsts.shared.model.ExamExecution execution = executionOpt.get();
+        LocalDateTime now = LocalDateTime.now();
+        if (execution.getScheduledStart() != null && now.isBefore(execution.getScheduledStart())) {
+            System.err.println("Start rejected: This execution has not opened yet.");
+            return null;
+        }
+        if (execution.getScheduledEnd() != null && now.isAfter(execution.getScheduledEnd())) {
+            System.err.println("Start rejected: This execution's window has closed.");
             return null;
         }
 
@@ -136,6 +137,13 @@ public class ExamServerController {
         if (hasStudentAlreadySubmitted(data.getStudentId(), data.getExamId())) {
             System.err.println("Start rejected: Student " + data.getStudentId() + " already took this exam.");
             return null;
+        }
+
+        // SUC-17: apply any extra minutes already granted to THIS execution - in-memory
+        // only (not persisted back to the exam's own row), so it affects this student's
+        // timer without permanently changing the exam's stored duration.
+        if (execution.getExtraMinutesGranted() > 0) {
+            exam.setDurationMinutes(exam.getDurationMinutes() + execution.getExtraMinutesGranted());
         }
 
         return exam; // Execution code verified; return exam payload
@@ -162,15 +170,24 @@ public class ExamServerController {
             return null;
         }
 
-        // 2. Optional: Verify exam is currently active/open for submission
-        LocalDateTime now = LocalDateTime.now();
-        if (exam.getScheduledStart() != null && now.isBefore(exam.getScheduledStart())) {
-            System.err.println("Submission rejected: Exam has not started yet.");
-            return null;
-        }
-        if (exam.getScheduledEnd() != null && now.isAfter(exam.getScheduledEnd())) {
-            System.err.println("Submission rejected: Exam window has expired.");
-            return null;
+        // 3. SUC 2.2: resolve which execution this submission belongs to, and validate
+        // against ITS window (not the exam's own legacy dates).
+        com.hsts.shared.model.ExamExecution execution = null;
+        if (data.getExecutionCode() != null) {
+            Optional<com.hsts.shared.model.ExamExecution> executionOpt =
+                    executionRepository.findByExamIdAndCode(data.getExamId(), data.getExecutionCode());
+            if (executionOpt.isPresent()) {
+                execution = executionOpt.get();
+                LocalDateTime now = LocalDateTime.now();
+                if (execution.getScheduledStart() != null && now.isBefore(execution.getScheduledStart())) {
+                    System.err.println("Submission rejected: This execution has not opened yet.");
+                    return null;
+                }
+                if (execution.getScheduledEnd() != null && now.isAfter(execution.getScheduledEnd())) {
+                    System.err.println("Submission rejected: This execution's window has expired.");
+                    return null;
+                }
+            }
         }
 
         double earnedPoints = 0.0;
@@ -191,8 +208,9 @@ public class ExamServerController {
 
         String newAnswerId = "EA" + (System.currentTimeMillis() % 100000);
         ExamAnswer answer = new ExamAnswer(newAnswerId, data.getExamId(), data.getStudentId());
+        answer.setExecutionId(execution != null ? execution.getExecutionId() : null);
         answer.setSelectedAnswers(data.getSelectedAnswers());
-        answer.setSubmittedAt(now);
+        answer.setSubmittedAt(LocalDateTime.now());
         answer.setAutoSubmitted(data.isAutoSubmitted());
         answer.setAutoScore(earnedPoints);
         answer.setFinalScore(earnedPoints); // Default until overridden by teacher
@@ -293,6 +311,44 @@ public class ExamServerController {
         return answerRepository.getExamStats(examId);
     }
 
+    // SUC 2.2: a teacher opens ANOTHER execution (sitting) of an already-approved exam.
+    // Any teacher may do this, not just the exam's original author (spec 7.2 explicitly
+    // allows performance by other teachers). Rejects if the exam isn't approved yet.
+    // Per 3.5: open/close dates are mandatory for every execution.
+    public com.hsts.shared.model.ExamExecution createExecution(String examId, String teacherId,
+                                                               String scheduledStartText, String scheduledEndText) {
+        Optional<Exam> opt = examRepository.findById(examId);
+        if (opt.isEmpty() || opt.get().getStatus() != ExamStatus.APPROVED) {
+            System.err.println("Create-execution rejected: exam " + examId + " is not approved.");
+            return null;
+        }
+
+        if (scheduledStartText == null || scheduledStartText.isBlank()
+                || scheduledEndText == null || scheduledEndText.isBlank()) {
+            System.err.println("Create-execution rejected: open/close dates are required.");
+            return null;
+        }
+
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        LocalDateTime start = parseOrDefault(scheduledStartText, fmt, LocalDateTime.now());
+        LocalDateTime end = parseOrDefault(scheduledEndText, fmt, start.plusDays(14));
+
+        String executionId = "EX" + (System.currentTimeMillis() % 100000);
+        com.hsts.shared.model.ExamExecution execution = new com.hsts.shared.model.ExamExecution(
+                executionId, examId, generateExecutionCode(), start, end, teacherId);
+        return executionRepository.save(execution) ? execution : null;
+    }
+
+    // Section 4: every execution (past and present) this exam has ever had.
+    public List<com.hsts.shared.model.ExamExecution> getExecutionsForExam(String examId) {
+        return executionRepository.findByExamId(examId);
+    }
+
+    // Section 4: started/finished/timed-out counts for one specific execution.
+    public com.hsts.shared.model.ExecutionStats getExecutionStats(String executionId) {
+        return answerRepository.getExecutionStats(executionId);
+    }
+
     // SUC-4: exams currently waiting on a coordinator's decision
     public List<Exam> getPendingApprovalExams() {
         List<Exam> all = examRepository.findAll();
@@ -381,10 +437,25 @@ public class ExamServerController {
         return new Object[]{examOpt.get(), answer};
     }
 
-    // SUC-17: a teacher extends the time for the CURRENT execution only (spec: temporary,
-    // applies only to this run, never changes the exam's base definition). This validates
-    // ownership and returns the exam - MainServerApp then pushes a live event to students
-    // currently taking it, instead of persisting a duration change to the exams table.
+    // SUC-17: a teacher extends the time for a SPECIFIC execution (spec: temporary,
+    // applies only to this run, never changes the exam's base definition). Persisted
+    // on the execution itself, so it applies to anyone taking this execution from now
+    // on - not just students already connected the instant this is called. Any teacher
+    // may do this, matching createExecution's permissiveness (spec 7.2).
+    public com.hsts.shared.model.ExamExecution extendExecutionTime(String executionId, int additionalMinutes) {
+        Optional<com.hsts.shared.model.ExamExecution> opt = executionRepository.findById(executionId);
+        if (opt.isEmpty()) {
+            return null;
+        }
+        boolean ok = executionRepository.addExtraMinutes(executionId, additionalMinutes);
+        if (!ok) {
+            return null;
+        }
+        return executionRepository.findById(executionId).orElse(null);
+    }
+
+    // Backward-compatible: extends the exam's FIRST/default execution by exam id,
+    // for older callers that don't know about specific execution ids yet.
     public Exam extendExamTime(String examId, String teacherId, int additionalMinutes) {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isEmpty()) {

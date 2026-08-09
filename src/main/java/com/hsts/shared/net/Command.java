@@ -56,5 +56,10 @@ public enum Command {
     // ===== School Principal - read-only access (SUC 7.3) =====
     GET_ALL_EXAMS,
     GET_ALL_RESULTS,
-    GET_EXAM_STATS
+    GET_EXAM_STATS,
+
+    // ===== Multiple exam executions (SUC 2.2 / SUC-4) =====
+    CREATE_EXAM_EXECUTION,
+    GET_EXAM_EXECUTIONS,
+    GET_EXECUTION_STATS
 }

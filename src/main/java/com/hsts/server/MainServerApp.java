@@ -546,8 +546,7 @@ public class MainServerApp {
             boolean isApproved = data.getReason() == null || data.getReason().isBlank();
 
             if (isApproved) {
-                resultExam = examServerController.approveExam(data.getExamId(), data.getCoordinatorId(),
-                        data.getScheduledStart(), data.getScheduledEnd());
+                resultExam = examServerController.approveExam(data.getExamId(), data.getCoordinatorId());
             } else {
                 resultExam = examServerController.rejectExam(
                         data.getExamId(),
@@ -696,21 +695,26 @@ public class MainServerApp {
 
         router.registerHandler(Command.EXTEND_EXAM_TIME, request -> {
             ExtendExamTimeData data = (ExtendExamTimeData) request.getPayload();
-            Exam exam = examServerController.extendExamTime(data.getExamId(), data.getTeacherId(), data.getAdditionalMinutes());
-            if (exam == null) {
+            com.hsts.shared.model.ExamExecution execution =
+                    examServerController.extendExecutionTime(data.getExecutionId(), data.getAdditionalMinutes());
+            if (execution == null) {
                 return Response.failure(Command.EXTEND_EXAM_TIME,
-                        "Could not extend time - check that you created this exam.", request.getRequestId());
+                        "Could not extend time - execution not found.", request.getRequestId());
             }
-            ExamEvent event = new ExamEvent(EventType.EXAM_TIME_EXTENDED, exam.getExamId(),
-                    exam.getCourseId(), null,
+            // Still push a live update too, for anyone already mid-exam right now -
+            // they don't need to wait for their next request to see the extra time.
+            ExamEvent event = new ExamEvent(EventType.EXAM_TIME_EXTENDED, execution.getExamId(),
+                    null, null,
                     "Your teacher extended this exam's time by " + data.getAdditionalMinutes() + " minutes.");
             event.setExtraMinutes(data.getAdditionalMinutes());
             eventBus.publish(event);
-            return Response.success(Command.EXTEND_EXAM_TIME, exam,
-                    "Time extended by " + data.getAdditionalMinutes() + " minutes for students currently taking this exam.",
+            return Response.success(Command.EXTEND_EXAM_TIME, execution,
+                    "Time extended by " + data.getAdditionalMinutes() + " minutes for this execution - "
+                            + "applies to students currently taking it AND anyone starting from now on.",
                     request.getRequestId());
         });
 
+        // SUC 7.3.1: Principal's read-only access - no filtering by teacher/course/status
         router.registerHandler(Command.GET_ALL_EXAMS, request -> {
             List<Exam> all = examServerController.getAllExams();
             return Response.success(Command.GET_ALL_EXAMS, all, null, request.getRequestId());
@@ -721,6 +725,7 @@ public class MainServerApp {
             return Response.success(Command.GET_ALL_RESULTS, all, null, request.getRequestId());
         });
 
+        // SUC 5 / 7.2 / 7.3.2: mean/median/decile stats for one exam
         router.registerHandler(Command.GET_EXAM_STATS, request -> {
             GetExamStatsData data = (GetExamStatsData) request.getPayload();
             Optional<ExamStats> stats = examServerController.getExamStats(data.getExamId());
@@ -730,6 +735,37 @@ public class MainServerApp {
                         request.getRequestId());
             }
             return Response.success(Command.GET_EXAM_STATS, stats.get(), null, request.getRequestId());
+        });
+
+        // SUC 2.2: a teacher opens another execution (sitting) of an already-approved exam
+        router.registerHandler(Command.CREATE_EXAM_EXECUTION, request -> {
+            com.hsts.shared.net.dto.CreateExamExecutionData data =
+                    (com.hsts.shared.net.dto.CreateExamExecutionData) request.getPayload();
+            com.hsts.shared.model.ExamExecution execution = examServerController.createExecution(
+                    data.getExamId(), data.getTeacherId(), data.getScheduledStart(), data.getScheduledEnd());
+            if (execution == null) {
+                return Response.failure(Command.CREATE_EXAM_EXECUTION,
+                        "Could not open a new execution - either the exam isn't approved, or this is the exam's "
+                                + "first execution and open/close dates are required.", request.getRequestId());
+            }
+            return Response.success(Command.CREATE_EXAM_EXECUTION, execution,
+                    "New execution opened - code: " + execution.getExecutionCode(), request.getRequestId());
+        });
+
+        // Section 4: every execution this exam has ever had
+        router.registerHandler(Command.GET_EXAM_EXECUTIONS, request -> {
+            com.hsts.shared.net.dto.GetExamExecutionsData data =
+                    (com.hsts.shared.net.dto.GetExamExecutionsData) request.getPayload();
+            List<com.hsts.shared.model.ExamExecution> executions = examServerController.getExecutionsForExam(data.getExamId());
+            return Response.success(Command.GET_EXAM_EXECUTIONS, executions, null, request.getRequestId());
+        });
+
+        // Section 4: started/finished/timed-out counts for one execution
+        router.registerHandler(Command.GET_EXECUTION_STATS, request -> {
+            com.hsts.shared.net.dto.GetExecutionStatsData data =
+                    (com.hsts.shared.net.dto.GetExecutionStatsData) request.getPayload();
+            com.hsts.shared.model.ExecutionStats stats = examServerController.getExecutionStats(data.getExecutionId());
+            return Response.success(Command.GET_EXECUTION_STATS, stats, null, request.getRequestId());
         });
     }
 
@@ -745,6 +781,7 @@ public class MainServerApp {
         router.registerHandler(Command.ASK_BOT_QUESTION, request -> {
             try {
                 if (request.getPayload() instanceof com.hsts.shared.net.dto.AskBotQuestionData data) {
+                    // SUC 6.2: a student may only use the bot for a course they're enrolled in.
                     if (!examServerController.isStudentEnrolled(data.getStudentId(), data.getCourseId())) {
                         return Response.failure(Command.ASK_BOT_QUESTION,
                                 "You're not registered for that course, so the study bot isn't available to you for it.",
@@ -752,6 +789,10 @@ public class MainServerApp {
                     }
 
                     String interactionId = "BOT-" + UUID.randomUUID().toString().substring(0, 8);
+                    // SUC-14: real external AI API call, per the spec's requirement
+                    // to use an existing bot rather than build one. Falls back to a
+                    // clear message if the key is missing or the call fails/returns
+                    // nothing usable - the spec explicitly allows for that case.
                     String realAnswer = botApiClient.ask(data.getQuestion(), data.getCourseId());
                     String finalAnswer = realAnswer != null ? realAnswer
                             : "Sorry, I couldn't come up with a good answer to that right now. "
@@ -814,6 +855,11 @@ public class MainServerApp {
             }
         });
 
+        // NOTE: the schema has no teacher-course assignment table, so unlike
+        // the mock (which scopes this to the requesting teacher's own
+        // courses), this aggregates bot usage across every course that has
+        // any activity at all. Anonymized either way - never shows which
+        // student asked what, only per-course totals.
         router.registerHandler(Command.GET_BOT_USAGE_STATS, request -> {
             try {
                 List<BotInteraction> all = botRepository.findAll();

@@ -22,6 +22,8 @@ public class ExamTakingClientController implements ResponseHandler {
     private final ServerConnection client;
     private Student currentStudent;
     private Exam currentExam;
+    /** SUC 2.2: remembered so it can be resent at submit time to resolve which execution this belongs to. */
+    private String currentExecutionCode;
     private ExamTakingWindow view;
 
     public ExamTakingClientController(ServerConnection client) {
@@ -45,6 +47,7 @@ public class ExamTakingClientController implements ResponseHandler {
     }
 
     public void startExam(String examId, String executionCode) {
+        this.currentExecutionCode = executionCode;
         client.sendToServer(Command.START_EXAM,
                 new StartExamData(examId, currentStudent.getId(), executionCode));
     }
@@ -53,8 +56,9 @@ public class ExamTakingClientController implements ResponseHandler {
         if (currentExam == null) {
             return;
         }
-        client.sendToServer(Command.SUBMIT_EXAM,
-                new SubmitExamData(currentExam.getExamId(), currentStudent.getId(), selectedAnswers, autoSubmitted));
+        SubmitExamData data = new SubmitExamData(currentExam.getExamId(), currentStudent.getId(), selectedAnswers, autoSubmitted);
+        data.setExecutionCode(currentExecutionCode);
+        client.sendToServer(Command.SUBMIT_EXAM, data);
     }
 
     @Override

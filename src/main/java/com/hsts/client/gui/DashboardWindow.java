@@ -33,6 +33,10 @@ public class DashboardWindow {
     @FXML private Label welcomeLabel;
     @FXML private Label roleLabel;
     @FXML private Label errorLabel;
+    @FXML private javafx.scene.layout.VBox questionBankSection;
+    @FXML private javafx.scene.layout.VBox examsSection;
+    @FXML private javafx.scene.layout.VBox studyBotSection;
+    @FXML private javafx.scene.layout.VBox principalSection;
     @FXML private Button questionsButton;
     @FXML private Button buildExamButton;
     @FXML private Button gradeExamsButton;
@@ -57,7 +61,7 @@ public class DashboardWindow {
         roleLabel.setText("Role: " + user.getRole());
 
         boolean isCoordinator = user instanceof SubjectCoordinator;
-        boolean isTeacher = user instanceof Teacher;
+        boolean isTeacher = user instanceof Teacher && !(user instanceof SubjectCoordinator);
         boolean isStudent = user instanceof Student;
         boolean isPrincipal = user instanceof Principal;
 
@@ -81,6 +85,23 @@ public class DashboardWindow {
         botChatButton.setManaged(isStudent);
         principalOverviewButton.setVisible(isPrincipal);
         principalOverviewButton.setManaged(isPrincipal);
+
+        // Hide the whole section (header + separator too) when nothing inside it
+        // would be visible for this role - otherwise an empty title/line shows
+        // even though every button underneath it is hidden.
+        boolean showQuestionBankSection = isTeacher;
+        boolean showExamsSection = isTeacher || isCoordinator || isStudent;
+        boolean showStudyBotSection = isTeacher || isStudent;
+        boolean showPrincipalSection = isPrincipal;
+
+        questionBankSection.setVisible(showQuestionBankSection);
+        questionBankSection.setManaged(showQuestionBankSection);
+        examsSection.setVisible(showExamsSection);
+        examsSection.setManaged(showExamsSection);
+        studyBotSection.setVisible(showStudyBotSection);
+        studyBotSection.setManaged(showStudyBotSection);
+        principalSection.setVisible(showPrincipalSection);
+        principalSection.setManaged(showPrincipalSection);
     }
 
     @FXML

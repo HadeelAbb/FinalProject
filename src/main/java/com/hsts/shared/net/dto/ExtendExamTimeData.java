@@ -5,16 +5,26 @@ import java.io.Serializable;
 /** SUC-17: teacher extends the time for an in-progress exam (temporary, this run only). */
 public class ExtendExamTimeData implements Serializable {
     private String examId;
+    private String executionId;
     private String teacherId;
     private int additionalMinutes;
 
     public ExtendExamTimeData() {
     }
 
-    public ExtendExamTimeData(String examId, String teacherId, int additionalMinutes) {
+    public ExtendExamTimeData(String examId, String executionId, String teacherId, int additionalMinutes) {
         this.examId = examId;
+        this.executionId = executionId;
         this.teacherId = teacherId;
         this.additionalMinutes = additionalMinutes;
+    }
+
+    public String getExecutionId() {
+        return executionId;
+    }
+
+    public void setExecutionId(String executionId) {
+        this.executionId = executionId;
     }
 
     public String getExamId() {

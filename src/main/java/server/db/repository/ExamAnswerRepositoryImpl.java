@@ -16,8 +16,8 @@ public class ExamAnswerRepositoryImpl {
     private final DatabaseManager dbManager = DatabaseManager.getInstance();
 
     public boolean save(ExamAnswer answer) {
-        String sqlAnswer = "INSERT INTO exam_answers (exam_answer_id, exam_id, student_id, submitted_at, auto_submitted, auto_score, final_score, grade_confirmed) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sqlAnswer = "INSERT INTO exam_answers (exam_answer_id, exam_id, execution_id, student_id, submitted_at, auto_submitted, auto_score, final_score, grade_confirmed) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         String sqlSelected = "INSERT INTO student_selected_answers (exam_answer_id, question_id, selected_answer_text) VALUES (?, ?, ?)";
 
@@ -30,12 +30,13 @@ public class ExamAnswerRepositoryImpl {
             try (PreparedStatement stmt = conn.prepareStatement(sqlAnswer)) {
                 stmt.setString(1, answer.getExamAnswerId());
                 stmt.setString(2, answer.getExamId());
-                stmt.setString(3, answer.getStudentId());
-                stmt.setTimestamp(4, answer.getSubmittedAt() != null ? Timestamp.valueOf(answer.getSubmittedAt()) : Timestamp.valueOf(java.time.LocalDateTime.now()));
-                stmt.setBoolean(5, answer.isAutoSubmitted());
-                stmt.setDouble(6, answer.getAutoScore() != null ? answer.getAutoScore() : 0.0);
-                stmt.setDouble(7, answer.getFinalScore() != null ? answer.getFinalScore() : 0.0);
-                stmt.setBoolean(8, answer.isGradeConfirmed());
+                stmt.setString(3, answer.getExecutionId());
+                stmt.setString(4, answer.getStudentId());
+                stmt.setTimestamp(5, answer.getSubmittedAt() != null ? Timestamp.valueOf(answer.getSubmittedAt()) : Timestamp.valueOf(java.time.LocalDateTime.now()));
+                stmt.setBoolean(6, answer.isAutoSubmitted());
+                stmt.setDouble(7, answer.getAutoScore() != null ? answer.getAutoScore() : 0.0);
+                stmt.setDouble(8, answer.getFinalScore() != null ? answer.getFinalScore() : 0.0);
+                stmt.setBoolean(9, answer.isGradeConfirmed());
 
                 stmt.executeUpdate();
             }
@@ -90,6 +91,7 @@ public class ExamAnswerRepositoryImpl {
                             rs.getString("exam_id"),
                             rs.getString("student_id")
                     );
+                    answer.setExecutionId(rs.getString("execution_id"));
 
                     Timestamp submittedAt = rs.getTimestamp("submitted_at");
                     if (submittedAt != null) {
@@ -264,6 +266,35 @@ public class ExamAnswerRepositoryImpl {
             findById(id).ifPresent(results::add);
         }
         return results;
+    }
+
+    /**
+     * Section 4: since this client always auto-submits at time-up, every student
+     * who starts an execution eventually gets a row here - so "started" is well
+     * approximated by "total submissions" for that execution, with no extra
+     * tracking needed. Splits those into finished-themselves vs ran-out-of-time.
+     */
+    public com.hsts.shared.model.ExecutionStats getExecutionStats(String executionId) {
+        String sql = "SELECT " +
+                "COUNT(*) AS total, " +
+                "SUM(CASE WHEN auto_submitted = 0 THEN 1 ELSE 0 END) AS finished, " +
+                "SUM(CASE WHEN auto_submitted = 1 THEN 1 ELSE 0 END) AS timedout " +
+                "FROM exam_answers WHERE execution_id = ?";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return new com.hsts.shared.model.ExecutionStats(executionId, 0, 0, 0);
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, executionId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new com.hsts.shared.model.ExecutionStats(executionId,
+                            rs.getInt("total"), rs.getInt("finished"), rs.getInt("timedout"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new com.hsts.shared.model.ExecutionStats(executionId, 0, 0, 0);
     }
 
     /** All confirmed results across every student and exam - for the Principal's read-only view (SUC 7.3.1). */

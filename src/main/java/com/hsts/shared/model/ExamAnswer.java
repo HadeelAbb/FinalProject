@@ -17,6 +17,8 @@ public class ExamAnswer implements Serializable {
 
     private String examAnswerId;
     private String examId;
+    /** SUC 2.2: which specific execution (sitting) this answer belongs to. */
+    private String executionId;
     private String studentId;
 
     /** questionId -> the answer text the student selected. */
@@ -57,6 +59,14 @@ public class ExamAnswer implements Serializable {
 
     public void setExamId(String examId) {
         this.examId = examId;
+    }
+
+    public String getExecutionId() {
+        return executionId;
+    }
+
+    public void setExecutionId(String executionId) {
+        this.executionId = executionId;
     }
 
     public String getStudentId() {
