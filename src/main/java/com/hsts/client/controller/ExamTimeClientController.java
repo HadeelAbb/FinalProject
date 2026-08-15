@@ -30,6 +30,7 @@ public class ExamTimeClientController implements ResponseHandler {
         client.registerHandler(Command.CREATE_EXAM_EXECUTION, this);
         client.registerHandler(Command.GET_EXAM_EXECUTIONS, this);
         client.registerHandler(Command.GET_EXECUTION_STATS, this);
+        client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void setCurrentTeacher(Teacher teacher) {
@@ -67,6 +68,13 @@ public class ExamTimeClientController implements ResponseHandler {
     @Override
     public void handleResponse(Response response) {
         if (view == null) {
+            return;
+        }
+        // A live push (an exam was approved/rejected, or someone opened a new
+        // execution somewhere) - refresh the exam list; the window itself
+        // re-loads executions for whatever exam is currently selected.
+        if (response.getCommand() == Command.EXAM_EVENT) {
+            refreshMyExams();
             return;
         }
         if (!response.isSuccess()) {

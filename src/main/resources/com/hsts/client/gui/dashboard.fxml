@@ -27,14 +27,14 @@
     <center>
         <VBox spacing="20" style="-fx-padding: 28 32 28 32;" maxWidth="480" BorderPane.alignment="TOP_CENTER">
 
-            <VBox spacing="8">
+            <VBox fx:id="questionBankSection" spacing="8">
                 <Label text="Question Bank" styleClass="section-label"/>
                 <Separator/>
                 <Button fx:id="questionsButton" onAction="#handleQuestions" text="Manage question bank"
                         maxWidth="Infinity" styleClass="action-button"/>
             </VBox>
 
-            <VBox spacing="8">
+            <VBox fx:id="examsSection" spacing="8">
                 <Label text="Exams" styleClass="section-label"/>
                 <Separator/>
                 <Button fx:id="buildExamButton" onAction="#handleBuildExam" text="Build an exam"
@@ -51,7 +51,7 @@
                         maxWidth="Infinity" styleClass="action-button"/>
             </VBox>
 
-            <VBox spacing="8">
+            <VBox fx:id="studyBotSection" spacing="8">
                 <Label text="Study Bot" styleClass="section-label"/>
                 <Separator/>
                 <Button fx:id="botChatButton" onAction="#handleBotChat" text="Ask the study bot"
@@ -60,7 +60,7 @@
                         maxWidth="Infinity" styleClass="action-button"/>
             </VBox>
 
-            <VBox spacing="8">
+            <VBox fx:id="principalSection" spacing="8">
                 <Label text="Principal" styleClass="section-label"/>
                 <Separator/>
                 <Button fx:id="principalOverviewButton" onAction="#handlePrincipalOverview" text="View all exams and results"

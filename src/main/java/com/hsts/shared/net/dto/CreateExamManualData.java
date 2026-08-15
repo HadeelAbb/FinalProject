@@ -15,14 +15,29 @@ public class CreateExamManualData implements Serializable {
     public CreateExamManualData() {
     }
 
+    // Backward-compatible for older callers (e.g. ExamBuildTestDriver) that don't supply teacher notes.
     public CreateExamManualData(String teacherId, String courseId, String title, String instructionsForStudents,
                                 List<String> questionIds, int durationMinutes) {
+        this(teacherId, courseId, title, instructionsForStudents, null, questionIds, durationMinutes);
+    }
+
+    public CreateExamManualData(String teacherId, String courseId, String title, String instructionsForStudents,
+                                String instructionsForTeacher, List<String> questionIds, int durationMinutes) {
         this.teacherId = teacherId;
         this.courseId = courseId;
         this.title = title;
         this.instructionsForStudents = instructionsForStudents;
+        this.instructionsForTeacher = instructionsForTeacher;
         this.questionIds = questionIds;
         this.durationMinutes = durationMinutes;
+    }
+
+    public String getInstructionsForTeacher() {
+        return instructionsForTeacher;
+    }
+
+    public void setInstructionsForTeacher(String instructionsForTeacher) {
+        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public String getTeacherId() {
@@ -55,14 +70,6 @@ public class CreateExamManualData implements Serializable {
 
     public void setInstructionsForStudents(String instructionsForStudents) {
         this.instructionsForStudents = instructionsForStudents;
-    }
-
-    public String getInstructionsForTeacher() {
-        return instructionsForTeacher;
-    }
-
-    public void setInstructionsForTeacher(String instructionsForTeacher) {
-        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public List<String> getQuestionIds() {

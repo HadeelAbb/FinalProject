@@ -69,11 +69,19 @@ public class ExamTakingClientController implements ResponseHandler {
         // EXAM_EVENT is a server-initiated push, not a reply to something we sent -
         // it can arrive at any time, including when there's nothing to do with it.
         if (response.getCommand() == Command.EXAM_EVENT) {
-            if (response.getPayload() instanceof ExamEvent event
-                    && event.getType() == EventType.EXAM_TIME_EXTENDED
-                    && currentExam != null
-                    && currentExam.getExamId().equals(event.getExamId())) {
-                view.onTimeExtended(event.getExtraMinutes(), event.getMessage());
+            if (response.getPayload() instanceof ExamEvent event) {
+                if (event.getType() == EventType.EXAM_TIME_EXTENDED
+                        && currentExam != null
+                        && currentExam.getExamId().equals(event.getExamId())) {
+                    view.onTimeExtended(event.getExtraMinutes(), event.getMessage());
+                } else if ((event.getType() == EventType.EXECUTION_CREATED
+                        || event.getType() == EventType.EXAM_APPROVED)
+                        && currentExam == null) {
+                    // A new execution opened somewhere, or an exam was approved - the
+                    // available-exams list might have changed. Only refresh if we're
+                    // not mid-exam right now, so this never disrupts an active attempt.
+                    loadAvailableExams();
+                }
             }
             return;
         }

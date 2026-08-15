@@ -85,8 +85,17 @@ public class MainServerApp {
 
         server.setConnectionRegistry(connectionRegistry);
 
+        // A server stop (IntelliJ's Stop button, Ctrl+C, normal exit) should always
+        // result in every account being logged out - otherwise a session can get
+        // stuck as "active" with no way to log back in until the server restarts
+        // (and even then, only if nothing else left it stuck).
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("[SHUTDOWN] Server is stopping - logging out all active sessions...");
+            loginServerController.logoutAll();
+        }));
+
         registerAuthRoutes(router, loginServerController);
-        registerQuestionRoutes(router, questionServerController, server);
+        registerQuestionRoutes(router, questionServerController, server, examServerController);
         registerExamRoutes(router, examServerController, eventBus);
         registerBotRoutes(router, botRepository, examServerController);
         configureSessionHandling(server, router, loginServerController, connectionRegistry);
@@ -199,7 +208,7 @@ public class MainServerApp {
                         teacher.setFirstName(firstName);
                         teacher.setLastName(lastName);
                         teacher.setRole("TEACHER");
-                        teacher.setCourses(loadCoursesFromDatabase());
+                        teacher.setCourses(loadTeacherCoursesFromDatabase(username));
                         return teacher;
                     }
                 }
@@ -253,6 +262,36 @@ public class MainServerApp {
         return courses;
     }
 
+    // R04/R11: only the courses this specific teacher is actually assigned to teach -
+    // used to populate their course dropdowns (exam builder, question bank, etc.) client-side.
+    private static List<Course> loadTeacherCoursesFromDatabase(String teacherId) {
+        List<Course> courses = new ArrayList<>();
+        Connection conn = DatabaseManager.getInstance().getConnection();
+
+        if (conn == null) {
+            System.err.println("[SERVER-ERROR] Cannot fetch teacher courses: database connection is null.");
+            return courses;
+        }
+
+        String sql = "SELECT c.course_id, c.name FROM courses c " +
+                "JOIN teacher_courses tc ON c.course_id = tc.course_id " +
+                "WHERE tc.teacher_id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, teacherId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    courses.add(new Course(rs.getString("course_id"), rs.getString("name")));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[SERVER-ERROR] Failed to fetch teacher courses from SQL:");
+            e.printStackTrace();
+        }
+
+        return courses;
+    }
+
     // SUC 6.2: only the courses this specific student is actually enrolled in -
     // used to populate their course dropdowns (bot chat, etc.) client-side.
     private static List<Course> loadStudentCoursesFromDatabase(String studentId) {
@@ -289,7 +328,8 @@ public class MainServerApp {
 
     private static void registerQuestionRoutes(ServerRequestRouter router,
                                                QuestionServerController questionServerController,
-                                               HSTSServer server) {
+                                               HSTSServer server,
+                                               ExamServerController examServerController) {
         router.registerHandler(Command.SEARCH_QUESTIONS, request -> {
             SearchQuestionsData data = (SearchQuestionsData) request.getPayload();
 
@@ -323,6 +363,16 @@ public class MainServerApp {
             String instructions = wrapperDto.getInstructions() != null ? wrapperDto.getInstructions() : "";
             String topic = wrapperDto.getTopic();
             String courseId = wrapperDto.getCourseId() != null ? wrapperDto.getCourseId() : DEFAULT_COURSE_ID;
+
+            // R04: teacher can only create questions for courses she teaches
+            if (wrapperDto.getTeacherId() != null
+                    && !examServerController.isTeacherAssignedToCourse(wrapperDto.getTeacherId(), courseId)) {
+                return Response.failure(
+                        Command.CREATE_QUESTION,
+                        "You don't teach this course, so you can't add questions to it.",
+                        request.getRequestId()
+                );
+            }
 
             List<String> answersList = new ArrayList<>();
             List<Integer> correctFlagsList = new ArrayList<>();
@@ -563,6 +613,13 @@ public class MainServerApp {
                 );
             }
 
+            EventType eventType = isApproved ? EventType.EXAM_APPROVED : EventType.EXAM_REJECTED;
+            String eventMessage = isApproved
+                    ? "Your exam \"" + resultExam.getTitle() + "\" was approved."
+                    : "Your exam \"" + resultExam.getTitle() + "\" was rejected.";
+            eventBus.publish(new ExamEvent(eventType, resultExam.getExamId(), resultExam.getCourseId(),
+                    resultExam.getCreatedByTeacherId(), eventMessage));
+
             return Response.success(
                     Command.APPROVE_EXAM,
                     resultExam,
@@ -582,6 +639,8 @@ public class MainServerApp {
                         request.getRequestId()
                 );
             }
+            eventBus.publish(new ExamEvent(EventType.EXAM_ANSWER_SUBMITTED, answer.getExamId(),
+                    null, null, "A new exam submission is waiting to be graded."));
             return Response.success(
                     Command.SUBMIT_EXAM,
                     answer,
@@ -592,15 +651,17 @@ public class MainServerApp {
 
         router.registerHandler(Command.CONFIRM_GRADE, request -> {
             ConfirmGradeData data = (ConfirmGradeData) request.getPayload();
-            boolean isSuccess = examServerController.confirmGrade(data);
+            String failureReason = examServerController.confirmGradeWithReason(data);
 
-            if (!isSuccess) {
+            if (failureReason != null) {
                 return Response.failure(
                         Command.CONFIRM_GRADE,
-                        "Failed to confirm grade in database.",
+                        failureReason,
                         request.getRequestId()
                 );
             }
+            eventBus.publish(new ExamEvent(EventType.EXAM_GRADED, data.getExamAnswerId(),
+                    null, null, "A grade was confirmed."));
             return Response.success(
                     Command.CONFIRM_GRADE,
                     true,
@@ -621,6 +682,8 @@ public class MainServerApp {
             if (exam == null) {
                 return Response.failure(Command.REJECT_EXAM, "Exam rejection failed.", request.getRequestId());
             }
+            eventBus.publish(new ExamEvent(EventType.EXAM_REJECTED, exam.getExamId(), exam.getCourseId(),
+                    exam.getCreatedByTeacherId(), "Your exam \"" + exam.getTitle() + "\" was rejected."));
             return Response.success(Command.REJECT_EXAM, exam, "Exam rejected.", request.getRequestId());
         });
 
@@ -631,6 +694,8 @@ public class MainServerApp {
                 return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
                         "Only a draft or rejected exam can be submitted for approval.", request.getRequestId());
             }
+            eventBus.publish(new ExamEvent(EventType.EXAM_SUBMITTED_FOR_APPROVAL, exam.getExamId(),
+                    exam.getCourseId(), null, "A new exam is waiting for approval: " + exam.getTitle()));
             return Response.success(Command.SUBMIT_EXAM_FOR_APPROVAL, exam,
                     "Exam submitted for approval.", request.getRequestId());
         });
@@ -748,6 +813,8 @@ public class MainServerApp {
                         "Could not open a new execution - either the exam isn't approved, or this is the exam's "
                                 + "first execution and open/close dates are required.", request.getRequestId());
             }
+            eventBus.publish(new ExamEvent(EventType.EXECUTION_CREATED, execution.getExamId(),
+                    null, null, "A new execution was opened - code: " + execution.getExecutionCode()));
             return Response.success(Command.CREATE_EXAM_EXECUTION, execution,
                     "New execution opened - code: " + execution.getExecutionCode(), request.getRequestId());
         });

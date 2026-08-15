@@ -29,6 +29,7 @@ public class ExamBuilderClientController implements ResponseHandler {
         client.registerHandler(Command.CREATE_EXAM_AUTO, this);
         client.registerHandler(Command.SUBMIT_EXAM_FOR_APPROVAL, this);
         client.registerHandler(Command.SEARCH_QUESTIONS, this);
+        client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void searchQuestionsForCourse(String courseId) {
@@ -46,18 +47,15 @@ public class ExamBuilderClientController implements ResponseHandler {
     public void createManual(String courseId, String title, String instructions, String teacherNotes,
                              List<String> questionIds, int durationMinutes) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
-        CreateExamManualData data = new CreateExamManualData(teacherId, courseId, title, instructions, questionIds, durationMinutes);
-        data.setInstructionsForTeacher(teacherNotes);
-        client.sendToServer(Command.CREATE_EXAM_MANUAL, data);
+        client.sendToServer(Command.CREATE_EXAM_MANUAL,
+                new CreateExamManualData(teacherId, courseId, title, instructions, teacherNotes, questionIds, durationMinutes));
     }
 
     public void createAuto(String courseId, String title, String instructions, String teacherNotes, String topic,
                            Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
-        CreateExamAutoData data = new CreateExamAutoData(teacherId, courseId, title,
-                instructions, topic, difficulty, numberOfQuestions, durationMinutes);
-        data.setInstructionsForTeacher(teacherNotes);
-        client.sendToServer(Command.CREATE_EXAM_AUTO, data);
+        client.sendToServer(Command.CREATE_EXAM_AUTO, new CreateExamAutoData(teacherId, courseId, title,
+                instructions, teacherNotes, topic, difficulty, numberOfQuestions, durationMinutes));
     }
 
     public void submitForApproval() {
@@ -76,6 +74,17 @@ public class ExamBuilderClientController implements ResponseHandler {
     @Override
     public void handleResponse(Response response) {
         if (view == null) {
+            return;
+        }
+        // A live push - only worth reacting to if it's about the exam we're currently viewing.
+        if (response.getCommand() == Command.EXAM_EVENT) {
+            if (response.getPayload() instanceof com.hsts.shared.net.ExamEvent event
+                    && currentDraft != null
+                    && currentDraft.getExamId().equals(event.getExamId())
+                    && (event.getType() == com.hsts.shared.net.EventType.EXAM_APPROVED
+                    || event.getType() == com.hsts.shared.net.EventType.EXAM_REJECTED)) {
+                view.onStatusChanged(event.getMessage());
+            }
             return;
         }
         if (!response.isSuccess()) {

@@ -23,16 +23,32 @@ public class CreateExamAutoData implements Serializable {
     public CreateExamAutoData() {
     }
 
+    // Backward-compatible for older callers (e.g. ExamBuildTestDriver) that don't supply teacher notes.
     public CreateExamAutoData(String teacherId, String courseId, String title, String instructionsForStudents,
                               String topic, Difficulty difficulty, int numberOfQuestions, int durationMinutes) {
+        this(teacherId, courseId, title, instructionsForStudents, null, topic, difficulty, numberOfQuestions, durationMinutes);
+    }
+
+    public CreateExamAutoData(String teacherId, String courseId, String title, String instructionsForStudents,
+                              String instructionsForTeacher, String topic, Difficulty difficulty,
+                              int numberOfQuestions, int durationMinutes) {
         this.teacherId = teacherId;
         this.courseId = courseId;
         this.title = title;
         this.instructionsForStudents = instructionsForStudents;
+        this.instructionsForTeacher = instructionsForTeacher;
         this.topic = topic;
         this.difficulty = difficulty;
         this.numberOfQuestions = numberOfQuestions;
         this.durationMinutes = durationMinutes;
+    }
+
+    public String getInstructionsForTeacher() {
+        return instructionsForTeacher;
+    }
+
+    public void setInstructionsForTeacher(String instructionsForTeacher) {
+        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public String getTeacherId() {
@@ -65,14 +81,6 @@ public class CreateExamAutoData implements Serializable {
 
     public void setInstructionsForStudents(String instructionsForStudents) {
         this.instructionsForStudents = instructionsForStudents;
-    }
-
-    public String getInstructionsForTeacher() {
-        return instructionsForTeacher;
-    }
-
-    public void setInstructionsForTeacher(String instructionsForTeacher) {
-        this.instructionsForTeacher = instructionsForTeacher;
     }
 
     public String getTopic() {

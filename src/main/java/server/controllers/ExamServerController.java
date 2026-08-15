@@ -24,6 +24,13 @@ public class ExamServerController {
 
     // SUC-2: Manual Exam Creation
     public Exam createManualExam(CreateExamManualData data) {
+        // R11: teacher can only build exams for courses she teaches
+        if (!isTeacherAssignedToCourse(data.getTeacherId(), data.getCourseId())) {
+            System.err.println("Create-exam rejected: teacher " + data.getTeacherId()
+                    + " does not teach course " + data.getCourseId());
+            return null;
+        }
+
         String newExamId = "E" + (System.currentTimeMillis() % 100000);
         List<Question> selectedQuestions = fetchQuestionsByIds(data.getQuestionIds());
 
@@ -37,6 +44,13 @@ public class ExamServerController {
 
     // SUC-3: Auto Exam Creation by Topic & Difficulty
     public Exam createAutoExam(CreateExamAutoData data) {
+        // R11: teacher can only build exams for courses she teaches
+        if (!isTeacherAssignedToCourse(data.getTeacherId(), data.getCourseId())) {
+            System.err.println("Create-exam rejected: teacher " + data.getTeacherId()
+                    + " does not teach course " + data.getCourseId());
+            return null;
+        }
+
         List<Question> matchingQuestions = fetchMatchingQuestions(
                 data.getCourseId(), data.getTopic(), data.getDifficulty(), data.getNumberOfQuestions());
 
@@ -53,6 +67,26 @@ public class ExamServerController {
         return examRepository.save(exam) ? exam : null;
     }
 
+    // R04/R11: whether a teacher is assigned to teach a given course.
+    public boolean isTeacherAssignedToCourse(String teacherId, String courseId) {
+        String sql = "SELECT COUNT(*) FROM teacher_courses WHERE teacher_id = ? AND course_id = ?";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return false;
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, teacherId);
+            stmt.setString(2, courseId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     // SUC-4 / SUC-3.5: Exam Approval - marks the exam eligible to be performed.
     // Per the spec (3.4/4/2.2): approval itself does NOT create an execution -
     // "taking the exam out of the drawer" is a distinct, separately-repeatable
@@ -62,6 +96,11 @@ public class ExamServerController {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isPresent()) {
             Exam exam = opt.get();
+            // R72: can't approve an exam with no questions
+            if (exam.getQuestions() == null || exam.getQuestions().isEmpty()) {
+                System.err.println("Approval rejected: exam " + examId + " has no questions.");
+                return null;
+            }
             exam.setStatus(ExamStatus.APPROVED);
             exam.setApprovedByCoordinatorId(coordinatorId);
             return examRepository.update(exam) ? exam : null;
@@ -76,7 +115,7 @@ public class ExamServerController {
         try {
             return LocalDateTime.parse(text.trim(), fmt);
         } catch (Exception e) {
-            System.err.println("Could not parse date '" + text + "' (expected yyyy-MM-dd HH:mm) - using default instead.");
+            System.err.println("Could not parse date '" + text + "' (expected dd-MM-yyyy HH:mm) - using default instead.");
             return fallback;
         }
     }
@@ -251,16 +290,40 @@ public class ExamServerController {
     }
 
     // SUC-7: Teacher Grade Confirmation / Score Override
-    public boolean confirmGrade(ConfirmGradeData data) {
+    // Returns null on success, or a specific reason string on failure - so the
+    // client can show a real error instead of a generic "database rejected it".
+    public String confirmGradeWithReason(ConfirmGradeData data) {
         Optional<ExamAnswer> opt = answerRepository.findById(data.getExamAnswerId());
-        if (opt.isPresent()) {
-            ExamAnswer answer = opt.get();
-            answer.setFinalScore(data.getFinalScore());
-            answer.setTeacherComment(data.getTeacherComment());
-            answer.setGradeConfirmed(true);
-            return answerRepository.update(answer);
+        if (opt.isEmpty()) {
+            return "That submission could not be found.";
         }
-        return false;
+        ExamAnswer answer = opt.get();
+
+        // R85: manual override can't exceed the exam's total points
+        double finalScore = data.getFinalScore();
+        Optional<Exam> examOpt = examRepository.findById(answer.getExamId());
+        if (examOpt.isPresent()) {
+            int maxPoints = examOpt.get().totalPoints();
+            if (finalScore > maxPoints) {
+                System.err.println("Grade confirmation rejected: score " + finalScore
+                        + " exceeds this exam's total points (" + maxPoints + ").");
+                return "Score cannot exceed this exam's total points (" + maxPoints + ").";
+            }
+        }
+        if (finalScore < 0) {
+            System.err.println("Grade confirmation rejected: score cannot be negative.");
+            return "Score cannot be negative.";
+        }
+
+        answer.setFinalScore(finalScore);
+        answer.setTeacherComment(data.getTeacherComment());
+        answer.setGradeConfirmed(true);
+        return answerRepository.update(answer) ? null : "Database update failed - please try again.";
+    }
+
+    // Backward-compatible boolean version, for anything still calling the old signature.
+    public boolean confirmGrade(ConfirmGradeData data) {
+        return confirmGradeWithReason(data) == null;
     }
 
     // SUC-9: full exam detail (with questions and correct answers) for the grading screen
@@ -329,9 +392,15 @@ public class ExamServerController {
             return null;
         }
 
-        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
         LocalDateTime start = parseOrDefault(scheduledStartText, fmt, LocalDateTime.now());
         LocalDateTime end = parseOrDefault(scheduledEndText, fmt, start.plusDays(14));
+
+        // R75: close date must be after open date
+        if (!end.isAfter(start)) {
+            System.err.println("Create-execution rejected: close date must be after open date.");
+            return null;
+        }
 
         String executionId = "EX" + (System.currentTimeMillis() % 100000);
         com.hsts.shared.model.ExamExecution execution = new com.hsts.shared.model.ExamExecution(
@@ -373,12 +442,33 @@ public class ExamServerController {
             if (!isStudentEnrolled(studentId, e.getCourseId())) {
                 continue;
             }
+            // R24: an exam is only "available" when it has at least one execution
+            // (sitting) with a currently-open window - not just because the exam
+            // itself was approved at some point.
+            if (!hasCurrentlyOpenExecution(e.getExamId())) {
+                continue;
+            }
             boolean alreadyTaken = mineSoFar.stream().anyMatch(a -> a.getExamId().equals(e.getExamId()));
             if (!alreadyTaken) {
                 available.add(e);
             }
         }
         return available;
+    }
+
+    // R24: whether this exam currently has at least one execution whose open/close
+    // window includes right now.
+    public boolean hasCurrentlyOpenExecution(String examId) {
+        List<com.hsts.shared.model.ExamExecution> executions = executionRepository.findByExamId(examId);
+        LocalDateTime now = LocalDateTime.now();
+        for (com.hsts.shared.model.ExamExecution execution : executions) {
+            boolean afterStart = execution.getScheduledStart() == null || !now.isBefore(execution.getScheduledStart());
+            boolean beforeEnd = execution.getScheduledEnd() == null || !now.isAfter(execution.getScheduledEnd());
+            if (afterStart && beforeEnd) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // SUC 6.2: whether a student is registered for a given course - now enforced

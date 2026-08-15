@@ -75,10 +75,18 @@ public class ExamTimeWindow {
             @Override
             protected void updateItem(ExamExecution execution, boolean empty) {
                 super.updateItem(execution, empty);
-                setText(empty || execution == null ? null
-                        : "Code " + execution.getExecutionCode()
-                          + (execution.getExtraMinutesGranted() > 0
-                             ? " (+" + execution.getExtraMinutesGranted() + " min granted)" : ""));
+                if (empty || execution == null) {
+                    setText(null);
+                    return;
+                }
+                String open = execution.getScheduledStart() != null
+                        ? execution.getScheduledStart().format(SEND_FORMAT) : "no open date";
+                String close = execution.getScheduledEnd() != null
+                        ? execution.getScheduledEnd().format(SEND_FORMAT) : "no close date";
+                setText("Code " + execution.getExecutionCode()
+                        + (execution.getExtraMinutesGranted() > 0
+                        ? " (+" + execution.getExtraMinutesGranted() + " min granted)" : "")
+                        + "\nOpen: " + open + "  Close: " + close);
             }
         });
         minutesSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 60, 10, 1));
@@ -172,6 +180,12 @@ public class ExamTimeWindow {
         if (end == null) {
             return;
         }
+        LocalDateTime startDateTime = LocalDateTime.parse(start, SEND_FORMAT);
+        LocalDateTime endDateTime = LocalDateTime.parse(end, SEND_FORMAT);
+        if (!endDateTime.isAfter(startDateTime)) {
+            showError("Close date/time must be after the open date/time.");
+            return;
+        }
         if (!NavigationHelper.confirm("Open a new sitting of \"" + selectedExam.getTitle()
                 + "\"? Students will need a fresh execution code to take this new sitting.")) {
             return;
@@ -181,9 +195,23 @@ public class ExamTimeWindow {
     }
 
     public void displayExams(List<Exam> exams) {
+        Exam previouslySelected = selectedExam;
         examListView.getItems().setAll(exams.stream().filter(e -> e.getStatus() == ExamStatus.APPROVED).toList());
         errorLabel.setText("");
         extendButton.setDisable(false);
+
+        if (previouslySelected != null) {
+            // Exam overrides equals()/hashCode() by examId, so this finds the
+            // same exam even though it's a freshly-deserialized instance from
+            // an automatic refresh - keeps the executions panel from clearing
+            // every time a live push comes in (e.g. someone else's approval).
+            for (Exam e : examListView.getItems()) {
+                if (e.equals(previouslySelected)) {
+                    examListView.getSelectionModel().select(e);
+                    return;
+                }
+            }
+        }
     }
 
     public void onExtended(ExamExecution execution, String message) {

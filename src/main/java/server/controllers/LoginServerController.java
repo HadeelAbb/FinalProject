@@ -72,4 +72,12 @@ public class LoginServerController {
     public boolean isAlreadyLoggedIn(String username) {
         return activeLoggedInUsers.contains(username);
     }
+
+    /** Called when the server is shutting down - clears every active session so no
+     * account is left stuck as "logged in" for the next time the server starts. */
+    public void logoutAll() {
+        int count = activeLoggedInUsers.size();
+        activeLoggedInUsers.clear();
+        System.out.println("[SHUTDOWN] Cleared " + count + " active session(s).");
+    }
 }

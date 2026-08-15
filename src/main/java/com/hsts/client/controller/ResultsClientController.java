@@ -23,6 +23,7 @@ public class ResultsClientController implements ResponseHandler {
         this.client = client;
         client.registerHandler(Command.GET_MY_RESULTS, this);
         client.registerHandler(Command.GET_EXAM_ANSWER_COPY, this);
+        client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void setCurrentStudent(Student student) {
@@ -45,6 +46,11 @@ public class ResultsClientController implements ResponseHandler {
     @Override
     public void handleResponse(Response response) {
         if (view == null) {
+            return;
+        }
+        // A live push (a grade was just confirmed, possibly one of ours) - refresh.
+        if (response.getCommand() == Command.EXAM_EVENT) {
+            refreshResults();
             return;
         }
         if (!response.isSuccess()) {

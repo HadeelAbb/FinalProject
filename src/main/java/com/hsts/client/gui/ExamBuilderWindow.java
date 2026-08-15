@@ -160,6 +160,11 @@ public class ExamBuilderWindow {
         statusLabel.setText("Submitted for approval - status: " + exam.getStatus());
     }
 
+    /** Live push: the exam currently being viewed just got approved/rejected elsewhere. */
+    public void onStatusChanged(String message) {
+        statusLabel.setText(message);
+    }
+
     public void showError(String message) {
         createButton.setDisable(false);
         errorLabel.setText(message);

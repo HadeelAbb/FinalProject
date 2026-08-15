@@ -12,5 +12,7 @@ public enum EventType implements Serializable {
     EXAM_APPROVED,
     EXAM_REJECTED,
     EXAM_GRADED,
-    EXAM_TIME_EXTENDED
+    EXAM_TIME_EXTENDED,
+    EXECUTION_CREATED,
+    EXAM_ANSWER_SUBMITTED
 }

@@ -25,6 +25,7 @@ public class GradingClientController implements ResponseHandler {
         client.registerHandler(Command.GET_PENDING_GRADING, this);
         client.registerHandler(Command.CONFIRM_GRADE, this);
         client.registerHandler(Command.GET_EXAM_DETAIL, this);
+        client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void setCurrentTeacher(Teacher teacher) {
@@ -51,6 +52,11 @@ public class GradingClientController implements ResponseHandler {
     @Override
     public void handleResponse(Response response) {
         if (view == null) {
+            return;
+        }
+        // A live push (someone else submitted an exam) - just refresh, nothing else to do with it.
+        if (response.getCommand() == Command.EXAM_EVENT) {
+            refreshPending();
             return;
         }
         if (!response.isSuccess()) {

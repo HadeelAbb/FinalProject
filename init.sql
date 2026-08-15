@@ -41,6 +41,7 @@ DROP TABLE IF EXISTS exam_questions;
 DROP TABLE IF EXISTS question_answers;
 DROP TABLE IF EXISTS questions;
 DROP TABLE IF EXISTS exams;
+DROP TABLE IF EXISTS teacher_courses;
 DROP TABLE IF EXISTS exam_executions;
 DROP TABLE IF EXISTS student_courses;
 DROP TABLE IF EXISTS courses;
@@ -89,6 +90,18 @@ CREATE TABLE student_courses (
 INSERT INTO student_courses (student_id, course_id) VALUES
                                                         ('student1', 'CS101'),
                                                         ('student1', 'MATH201');
+
+CREATE TABLE teacher_courses (
+                                 teacher_id VARCHAR(50) NOT NULL,
+                                 course_id VARCHAR(10) NOT NULL,
+                                 PRIMARY KEY (teacher_id, course_id),
+                                 FOREIGN KEY (teacher_id) REFERENCES users(username) ON DELETE CASCADE,
+                                 FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO teacher_courses (teacher_id, course_id) VALUES
+                                                        ('teacher1', 'CS101'),
+                                                        ('teacher1', 'MATH201');
 
 -- --------------------------------------------------------
 -- 3. Table Structure: questions
