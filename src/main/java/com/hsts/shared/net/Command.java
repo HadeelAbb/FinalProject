@@ -16,6 +16,7 @@ public enum Command {
     // ===== Exam building (SUC-2 manual, SUC-3 automatic) =====
     CREATE_EXAM_MANUAL,
     CREATE_EXAM_AUTO,
+    CREATE_EXAM_VERSION,
     GET_MY_EXAMS,
 
     // ===== Exam approval (SUC-4) =====
@@ -33,6 +34,7 @@ public enum Command {
     GET_PENDING_GRADING,
     CONFIRM_GRADE,
     GET_EXAM_DETAIL,
+    GET_EXAM_RESULTS,
 
     // ===== Viewing results (SUC-10) =====
     GET_MY_RESULTS,
@@ -57,6 +59,8 @@ public enum Command {
     GET_ALL_EXAMS,
     GET_ALL_RESULTS,
     GET_EXAM_STATS,
+    GET_PRINCIPAL_COMPARISON_REPORT,
+    GET_ALL_QUESTIONS,
 
     // ===== Multiple exam executions (SUC 2.2 / SUC-4) =====
     CREATE_EXAM_EXECUTION,

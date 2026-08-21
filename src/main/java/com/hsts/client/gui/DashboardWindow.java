@@ -9,8 +9,11 @@ import com.hsts.client.controller.ExamTimeClientController;
 import com.hsts.client.controller.GradingClientController;
 import com.hsts.client.controller.LoginClientController;
 import com.hsts.client.controller.PrincipalClientController;
+import com.hsts.client.controller.PrincipalComparisonClientController;
+import com.hsts.client.controller.PrincipalQuestionBankClientController;
 import com.hsts.client.controller.QuestionClientController;
 import com.hsts.client.controller.ResultsClientController;
+import com.hsts.client.controller.TeacherResultsClientController;
 import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.Principal;
 import com.hsts.shared.model.Student;
@@ -40,6 +43,7 @@ public class DashboardWindow {
     @FXML private Button questionsButton;
     @FXML private Button buildExamButton;
     @FXML private Button gradeExamsButton;
+    @FXML private Button examResultsButton;
     @FXML private Button approveExamsButton;
     @FXML private Button takeExamButton;
     @FXML private Button myResultsButton;
@@ -47,6 +51,8 @@ public class DashboardWindow {
     @FXML private Button botStatsButton;
     @FXML private Button botChatButton;
     @FXML private Button principalOverviewButton;
+    @FXML private Button principalComparisonButton;
+    @FXML private Button principalQuestionBankButton;
 
     private User user;
     private ServerConnection client;
@@ -71,6 +77,8 @@ public class DashboardWindow {
         buildExamButton.setManaged(isTeacher);
         gradeExamsButton.setVisible(isTeacher);
         gradeExamsButton.setManaged(isTeacher);
+        examResultsButton.setVisible(isTeacher);
+        examResultsButton.setManaged(isTeacher);
         approveExamsButton.setVisible(isCoordinator);
         approveExamsButton.setManaged(isCoordinator);
         takeExamButton.setVisible(isStudent);
@@ -85,6 +93,10 @@ public class DashboardWindow {
         botChatButton.setManaged(isStudent);
         principalOverviewButton.setVisible(isPrincipal);
         principalOverviewButton.setManaged(isPrincipal);
+        principalComparisonButton.setVisible(isPrincipal);
+        principalComparisonButton.setManaged(isPrincipal);
+        principalQuestionBankButton.setVisible(isPrincipal);
+        principalQuestionBankButton.setManaged(isPrincipal);
 
         // Hide the whole section (header + separator too) when nothing inside it
         // would be visible for this role - otherwise an empty title/line shows
@@ -154,6 +166,20 @@ public class DashboardWindow {
             switchScene(root, "HSTS - Grade Exams");
         } catch (IOException e) {
             showError("Could not open grading screen.");
+        }
+    }
+
+    @FXML
+    void handleExamResults(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/teacher_results.fxml"));
+            Parent root = loader.load();
+            TeacherResultsWindow trw = loader.getController();
+            TeacherResultsClientController controller = new TeacherResultsClientController(client);
+            trw.init(controller, (Teacher) user, client, loginController);
+            switchScene(root, "HSTS - Exam Results");
+        } catch (IOException e) {
+            showError("Could not open exam results screen.");
         }
     }
 
@@ -252,6 +278,38 @@ public class DashboardWindow {
             switchScene(root, "HSTS - Principal Overview");
         } catch (IOException e) {
             showError("Could not open principal overview screen.");
+        }
+    }
+
+    @FXML
+    void handlePrincipalComparison(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/principal_comparison.fxml"));
+            Parent root = loader.load();
+            PrincipalComparisonWindow pcw = loader.getController();
+            PrincipalComparisonClientController controller = new PrincipalComparisonClientController(client);
+            pcw.init(controller, (Principal) user, client, loginController);
+            Stage stage = (Stage) welcomeLabel.getScene().getWindow();
+            stage.setTitle("HSTS - Comparison Reports");
+            stage.setScene(new Scene(root, 1000, 760));
+        } catch (IOException e) {
+            showError("Could not open comparison reports screen.");
+        }
+    }
+
+    @FXML
+    void handlePrincipalQuestionBank(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/hsts/client/gui/principal_question_bank.fxml"));
+            Parent root = loader.load();
+            PrincipalQuestionBankWindow pqbw = loader.getController();
+            PrincipalQuestionBankClientController controller = new PrincipalQuestionBankClientController(client);
+            pqbw.init(controller, (Principal) user, client, loginController);
+            Stage stage = (Stage) welcomeLabel.getScene().getWindow();
+            stage.setTitle("HSTS - Question Bank");
+            stage.setScene(new Scene(root, 1000, 640));
+        } catch (IOException e) {
+            showError("Could not open question bank screen.");
         }
     }
 

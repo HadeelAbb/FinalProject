@@ -5,6 +5,7 @@ import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.QuestionAnswer;
+import com.hsts.shared.model.QuestionIllustration;
 import com.hsts.shared.model.User;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -16,7 +17,11 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.image.ImageView;
+import javafx.stage.FileChooser;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
@@ -69,7 +74,13 @@ public class QuestionManagementWindow {
     @FXML
     private ComboBox<Course> courseSelector;
     @FXML
-    private TextField imagePathField;
+    private Button browseImageButton;
+    @FXML
+    private Label imageFileLabel;
+    @FXML
+    private ImageView illustrationView;
+    @FXML
+    private Label versionLabel;
 
     @FXML
     private Button saveButton;
@@ -83,6 +94,8 @@ public class QuestionManagementWindow {
 
     private QuestionClientController controller;
     private Question selectedQuestion;
+    private byte[] pendingImageData;
+    private String pendingImageFilename;
     private final ToggleGroup correctAnswerGroup = new ToggleGroup();
 
     // Used right after a save/delete to find the affected question in the
@@ -186,6 +199,43 @@ public class QuestionManagementWindow {
         selectedQuestion = null;
         questionListView.getSelectionModel().clearSelection();
         clearForm();
+        saveButton.setDisable(false);
+        if (versionLabel != null) {
+            versionLabel.setText("");
+        }
+        if (browseImageButton != null) {
+            browseImageButton.setDisable(false);
+        }
+    }
+
+    @FXML
+    private void handleBrowseImage() {
+        if (selectedQuestion != null && !selectedQuestion.isLatest()) {
+            showError("Only the current version of this question can be edited.");
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Choose question illustration");
+        chooser.getExtensionFilters().setAll(
+                new FileChooser.ExtensionFilter("PNG or JPG", "*.png", "*.jpg", "*.jpeg"));
+        File file = chooser.showOpenDialog(browseImageButton != null && browseImageButton.getScene() != null
+                ? browseImageButton.getScene().getWindow() : null);
+        if (file == null) {
+            return;
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(file.toPath());
+            String error = QuestionIllustration.validate(bytes, file.getName());
+            if (error != null) {
+                showError(error);
+                return;
+            }
+            pendingImageData = bytes;
+            pendingImageFilename = QuestionIllustration.filenameForStorage(bytes, file.getName());
+            showIllustration(pendingImageData, pendingImageFilename);
+        } catch (Exception e) {
+            showError("Could not read the selected image.");
+        }
     }
 
     @FXML
@@ -196,7 +246,6 @@ public class QuestionManagementWindow {
         String instructions = trimToNull(instructionsField.getText());
         Difficulty difficulty = difficultySelector.getValue();
         String topic = trimToNull(topicField.getText());
-        String imagePath = trimToNull(imagePathField.getText());
         Course selectedCourse = courseSelector.getValue();
 
         if (text == null || difficulty == null || topic == null || selectedCourse == null) {
@@ -217,16 +266,22 @@ public class QuestionManagementWindow {
             return; // showError already called inside collectAnswers
         }
 
+        if (selectedQuestion != null && !selectedQuestion.isLatest()) {
+            showError("Only the current version of this question can be edited.");
+            return;
+        }
         String courseId = selectedCourse.getId();
 
         if (selectedQuestion == null) {
-            controller.createQuestion(text, instructions, difficulty, topic, imagePath, courseId, answers);
+            controller.createQuestion(text, instructions, difficulty, topic, pendingImageFilename,
+                    pendingImageData, courseId, answers);
         } else {
             selectedQuestion.setText(text);
             selectedQuestion.setInstructions(instructions);
             selectedQuestion.setDifficulty(difficulty);
             selectedQuestion.setTopic(topic);
-            selectedQuestion.setImagePath(imagePath);
+            selectedQuestion.setImagePath(pendingImageFilename);
+            selectedQuestion.setImageData(pendingImageData);
             selectedQuestion.setAnswers(answers);
             controller.editQuestion(selectedQuestion);
         }
@@ -269,12 +324,14 @@ public class QuestionManagementWindow {
     public void onQuestionSaved(Question question) {
         pendingSelectQuestionId = question.getQuestionId();
 
-        // Clear any active filters - otherwise a saved question that doesn't
-        // match the current search (e.g. different course/topic) would
-        // vanish from the list and look like the save silently failed.
+        // Clear topic/difficulty filters so a just-saved question is not hidden
+        // by an unrelated search. Keep (or set) the course filter to the saved
+        // question's real course id (e.g. CS101). Searching with a null course
+        // currently falls back to a leftover numeric default ("11") on the
+        // server, which would make the new row look like it never persisted.
         searchTopicField.clear();
         searchDifficultySelector.setValue(null);
-        searchCourseSelector.setValue(null);
+        searchCourseSelector.setValue(findCourseById(question.getCourseId()));
 
         // FIX: previously this message was set after handleSearchQuestions()
         // returned, but that call is asynchronous - it fires the request and
@@ -287,7 +344,10 @@ public class QuestionManagementWindow {
         // now set first, and suppressMessageClear is reset inside
         // displayQuestions() instead, after the re-selection it's meant to
         // protect has actually happened - see displayQuestions() below.
-        statusLabel.setText("Question " + question.getQuestionId() + " saved successfully.");
+        statusLabel.setText(question.getVersionNumber() > 1
+                ? "Question updated. Version " + question.getVersionNumber()
+                + " created; previous version was preserved."
+                : "Question " + question.getQuestionId() + " saved successfully.");
 
         suppressMessageClear = true;
         handleSearchQuestions();
@@ -319,7 +379,20 @@ public class QuestionManagementWindow {
         difficultySelector.setValue(question.getDifficulty());
         topicField.setText(question.getTopic());
         courseSelector.setValue(findCourseById(question.getCourseId()));
-        imagePathField.setText(question.getImagePath());
+        pendingImageData = question.getImageData();
+        pendingImageFilename = question.getImagePath();
+        showIllustration(pendingImageData, pendingImageFilename);
+        if (versionLabel != null) {
+            versionLabel.setText("Version " + question.getVersionNumber()
+                    + " — " + question.versionStatusLabel());
+        }
+        saveButton.setDisable(!question.isLatest());
+        if (browseImageButton != null) {
+            browseImageButton.setDisable(!question.isLatest());
+        }
+        if (!question.isLatest() && !suppressMessageClear) {
+            statusLabel.setText("This version is historical (read-only). Edit the current version to create a new one.");
+        }
 
         List<QuestionAnswer> answers = question.getAnswers();
         TextField[] fields = {answer1Field, answer2Field, answer3Field, answer4Field};
@@ -381,11 +454,25 @@ public class QuestionManagementWindow {
         difficultySelector.setValue(null);
         topicField.clear();
         courseSelector.setValue(null);
-        imagePathField.clear();
+        pendingImageData = null;
+        pendingImageFilename = null;
+        showIllustration(null, null);
+        if (versionLabel != null) {
+            versionLabel.setText("");
+        }
+        saveButton.setDisable(false);
         for (TextField f : new TextField[]{answer1Field, answer2Field, answer3Field, answer4Field}) {
             f.clear();
         }
         correctAnswerGroup.selectToggle(null);
+    }
+
+    private void showIllustration(byte[] imageData, String filename) {
+        if (imageFileLabel != null) {
+            imageFileLabel.setText(QuestionIllustration.hasData(imageData) && filename != null && !filename.isBlank()
+                    ? filename : (QuestionIllustration.hasData(imageData) ? "Illustration attached" : "No illustration"));
+        }
+        QuestionIllustrationView.apply(illustrationView, imageData);
     }
 
     private void clearMessages() {

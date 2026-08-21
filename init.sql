@@ -13,7 +13,7 @@
 -- 3. questions               - Bank of questions classified by difficulty, topic, and course
 -- 4. question_answers        - Multiple-choice options with correctness flags
 -- 5. exams                   - Exam drafts and approved exams with 4-character execution codes
--- 6. exam_questions          - Join table linking questions to specific exams with order
+-- 6. exam_questions          - Join table linking questions to specific exams with order and points
 -- 7. exam_answers            - Student exam submissions and automated/manual scores
 -- 8. student_selected_answers - Individual student answers per submitted exam attempt
 --
@@ -26,7 +26,7 @@
 -- SEEDED COURSE & EXAM DATA:
 -- • Courses: CS101 (Computer Science Fundamentals), MATH201 (Linear Algebra & Calculus)
 -- • Questions: 5 pre-loaded CS101 questions across Architecture, Data Structures, Concurrency, etc.
--- • Active Exam: Exam E72874 (Code: HKD6) linked to all 5 questions, approved and scheduled
+-- • Active Exam: Exam E72874 (APPROVED) with ExamExecution EXSEED01 / code HKD6
 -- ============================================================================
 CREATE DATABASE IF NOT EXISTS hsts_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE hsts_db;
@@ -113,16 +113,22 @@ CREATE TABLE questions (
                            instructions TEXT,
                            topic VARCHAR(100),
                            course_id VARCHAR(10),
-                           FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+                           root_question_id VARCHAR(10) NOT NULL,
+                           version_number INT NOT NULL DEFAULT 1,
+                           is_latest TINYINT(1) NOT NULL DEFAULT 1,
+                           image_filename VARCHAR(255) NULL,
+                           image_data LONGBLOB NULL,
+                           FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+                           UNIQUE KEY uk_question_lineage (root_question_id, version_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed Questions
-INSERT INTO questions (question_id, text, difficulty, instructions, topic, course_id) VALUES
-                                                                                          ('11001', 'What is the main function of the CPU?', 'EASY', 'Select the best single option.', 'Architecture', 'CS101'),
-                                                                                          ('11002', 'Which data structure follows LIFO order?', 'EASY', 'Select the correct memory structure.', 'Data Structures', 'CS101'),
-                                                                                          ('11003', 'What is the advantage of multi-threading?', 'MEDIUM', 'Select performance benefit.', 'Concurrency', 'CS101'),
-                                                                                          ('11004', 'What does Foreign Key ensure in relational DBs?', 'MEDIUM', 'Select relational property.', 'Databases', 'CS101'),
-                                                                                          ('11005', 'What is binary search time complexity?', 'HARD', 'Assume sorted array.', 'Algorithms', 'CS101');
+-- Seed Questions (each row is Version 1 / current)
+INSERT INTO questions (question_id, text, difficulty, instructions, topic, course_id, root_question_id, version_number, is_latest) VALUES
+                                                                                          ('11001', 'What is the main function of the CPU?', 'EASY', 'Select the best single option.', 'Architecture', 'CS101', '11001', 1, 1),
+                                                                                          ('11002', 'Which data structure follows LIFO order?', 'EASY', 'Select the correct memory structure.', 'Data Structures', 'CS101', '11002', 1, 1),
+                                                                                          ('11003', 'What is the advantage of multi-threading?', 'MEDIUM', 'Select performance benefit.', 'Concurrency', 'CS101', '11003', 1, 1),
+                                                                                          ('11004', 'What does Foreign Key ensure in relational DBs?', 'MEDIUM', 'Select relational property.', 'Databases', 'CS101', '11004', 1, 1),
+                                                                                          ('11005', 'What is binary search time complexity?', 'HARD', 'Assume sorted array.', 'Algorithms', 'CS101', '11005', 1, 1);
 
 -- --------------------------------------------------------
 -- 4. Table Structure: question_answers
@@ -135,18 +141,28 @@ CREATE TABLE question_answers (
                                   FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed Question Choices
+-- Seed Question Choices (exactly 4 answers, exactly 1 correct per question)
 INSERT INTO question_answers (question_id, answer_text, is_correct) VALUES
                                                                         ('11001', 'Execute instructions and perform arithmetic/logic operations', 1),
                                                                         ('11001', 'Store long-term hard disk files', 0),
+                                                                        ('11001', 'Display graphics on the monitor', 0),
+                                                                        ('11001', 'Manage network routing tables', 0),
                                                                         ('11002', 'Stack', 1),
                                                                         ('11002', 'Queue', 0),
+                                                                        ('11002', 'Hash table', 0),
+                                                                        ('11002', 'Circular buffer', 0),
                                                                         ('11003', 'Allows concurrent execution of tasks to maximize CPU utilization', 1),
                                                                         ('11003', 'Prevents all memory allocation', 0),
+                                                                        ('11003', 'Guarantees deadlock-free execution', 0),
+                                                                        ('11003', 'Disables CPU scheduling', 0),
                                                                         ('11004', 'Referential Integrity between tables', 1),
                                                                         ('11004', 'Faster network socket streaming', 0),
+                                                                        ('11004', 'Automatic index creation on every column', 0),
+                                                                        ('11004', 'Encryption of all stored passwords', 0),
                                                                         ('11005', 'O(log n)', 1),
-                                                                        ('11005', 'O(1)', 0);
+                                                                        ('11005', 'O(1)', 0),
+                                                                        ('11005', 'O(n)', 0),
+                                                                        ('11005', 'O(n^2)', 0);
 
 -- --------------------------------------------------------
 -- 5. Table Structure: exams
@@ -165,17 +181,23 @@ CREATE TABLE exams (
                        execution_code VARCHAR(10),
                        scheduled_start DATETIME,
                        scheduled_end DATETIME,
+                       root_exam_id VARCHAR(10) NULL,
+                       version_number INT NOT NULL DEFAULT 1,
+                       is_latest TINYINT(1) NOT NULL DEFAULT 1,
                        FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
-                       FOREIGN KEY (created_by_teacher_id) REFERENCES users(username) ON DELETE CASCADE
+                       FOREIGN KEY (created_by_teacher_id) REFERENCES users(username) ON DELETE CASCADE,
+                       UNIQUE KEY uk_exam_lineage (root_exam_id, version_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed Approved Active Exam (Code: HKD6)
+-- Seed Approved Active Exam (Code: HKD6) — Version 1 / current
 INSERT INTO exams (
     exam_id, course_id, title, instructions, duration_minutes,
-    created_by_teacher_id, status, execution_code, scheduled_start, scheduled_end
+    created_by_teacher_id, status, execution_code, scheduled_start, scheduled_end,
+    root_exam_id, version_number, is_latest
 ) VALUES (
              'E72874', 'CS101', 'Test-exam', 'Complete all questions within duration.', 60,
-             'teacher1', 'APPROVED', 'HKD6', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 14 DAY)
+             'teacher1', 'APPROVED', 'HKD6', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 14 DAY),
+             'E72874', 1, 1
          );
 
 -- --------------------------------------------------------
@@ -185,18 +207,19 @@ CREATE TABLE exam_questions (
                                 exam_id VARCHAR(10) NOT NULL,
                                 question_id VARCHAR(10) NOT NULL,
                                 question_order INT DEFAULT 1,
+                                points INT NOT NULL,
                                 PRIMARY KEY (exam_id, question_id),
                                 FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
                                 FOREIGN KEY (question_id) REFERENCES questions(question_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed Questions Linked to Exam E72874
-INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES
-                                                                      ('E72874', '11001', 1),
-                                                                      ('E72874', '11002', 2),
-                                                                      ('E72874', '11003', 3),
-                                                                      ('E72874', '11004', 4),
-                                                                      ('E72874', '11005', 5);
+-- Seed Questions Linked to Exam E72874 (20 points each = 100)
+INSERT INTO exam_questions (exam_id, question_id, question_order, points) VALUES
+                                                                      ('E72874', '11001', 1, 20),
+                                                                      ('E72874', '11002', 2, 20),
+                                                                      ('E72874', '11003', 3, 20),
+                                                                      ('E72874', '11004', 4, 20),
+                                                                      ('E72874', '11005', 5, 20);
 
 -- --------------------------------------------------------
 -- 7. Table Structure: exam_answers
@@ -209,9 +232,22 @@ CREATE TABLE exam_executions (
                                  scheduled_end DATETIME,
                                  extra_minutes_granted INT DEFAULT 0,
                                  created_by_teacher_id VARCHAR(50) NOT NULL,
+                                 UNIQUE KEY uk_exam_executions_code (execution_code),
                                  FOREIGN KEY (exam_id) REFERENCES exams(exam_id) ON DELETE CASCADE,
                                  FOREIGN KEY (created_by_teacher_id) REFERENCES users(username) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed one currently-open execution of approved exam E72874.
+-- Production student entry uses this table (not exams.execution_code).
+-- Dates are relative to NOW() so the demo window stays open after a fresh import.
+INSERT INTO exam_executions (
+    execution_id, exam_id, execution_code, scheduled_start, scheduled_end,
+    extra_minutes_granted, created_by_teacher_id
+) VALUES (
+    'EXSEED01', 'E72874', 'HKD6',
+    DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 14 DAY),
+    0, 'teacher1'
+);
 
 CREATE TABLE exam_answers (
                               exam_answer_id VARCHAR(20) PRIMARY KEY,

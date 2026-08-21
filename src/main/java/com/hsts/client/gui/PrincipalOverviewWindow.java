@@ -6,6 +6,7 @@ import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
 import com.hsts.shared.model.ExamStats;
+import com.hsts.shared.model.GradeHistogramCalculator;
 import com.hsts.shared.model.Principal;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -78,7 +79,10 @@ public class PrincipalOverviewWindow {
         int[] deciles = stats.getDeciles();
         for (int i = 0; i < deciles.length; i++) {
             if (deciles[i] > 0) {
-                decileText.append(i * 10).append("-").append(i * 10 + 9).append(": ")
+                String bucket = i < GradeHistogramCalculator.BUCKET_LABELS.length
+                        ? GradeHistogramCalculator.BUCKET_LABELS[i]
+                        : (i * 10) + "-" + (i * 10 + 9);
+                decileText.append(bucket).append(": ")
                         .append(deciles[i]).append(" students   ");
             }
         }

@@ -14,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.layout.VBox;
 
 import java.util.List;
 
@@ -117,13 +118,22 @@ public class ResultsWindow {
             super.updateItem(row, empty);
             if (empty || row == null) {
                 setText(null);
+                setGraphic(null);
                 setStyle("");
                 return;
             }
             String myText = row.myAnswer() != null ? row.myAnswer() : "(no answer)";
             String line = row.question().getText() + "\n  your answer: " + myText
                     + (row.correct() ? "  \u2713 correct" : "  \u2717 incorrect - correct answer: " + row.correctAnswer());
-            setText(line);
+            Label label = new Label(line);
+            label.setWrapText(true);
+            VBox box = new VBox(4, label);
+            javafx.scene.image.ImageView illustration = QuestionIllustrationView.preview(row.question(), 320, 160);
+            if (illustration.getImage() != null) {
+                box.getChildren().add(illustration);
+            }
+            setText(null);
+            setGraphic(box);
             setStyle(row.correct() ? "-fx-text-fill: #1a7a1a;" : "-fx-text-fill: #b3261e;");
         }
     }

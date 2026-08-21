@@ -12,6 +12,7 @@ public class CreateQuestionData implements Serializable {
     private Difficulty difficulty;
     private String topic;
     private String imagePath;
+    private byte[] imageData;
     private String courseId;
     private String teacherId;
     private List<QuestionAnswer> answers;
@@ -70,6 +71,14 @@ public class CreateQuestionData implements Serializable {
 
     public void setImagePath(String imagePath) {
         this.imagePath = imagePath;
+    }
+
+    public byte[] getImageData() {
+        return imageData;
+    }
+
+    public void setImageData(byte[] imageData) {
+        this.imageData = imageData;
     }
 
     public String getCourseId() {

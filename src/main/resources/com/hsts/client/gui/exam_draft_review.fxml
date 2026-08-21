@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hsts.client.gui.ExamDraftReviewWindow"
+            styleClass="body-pane" stylesheets="@app.css">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="top-bar" style="-fx-padding: 14 24 14 24;">
+            <Label text="Review exam draft" styleClass="top-bar-title"/>
+        </HBox>
+    </top>
+
+    <center>
+        <VBox spacing="8" style="-fx-padding: 12;">
+            <Label fx:id="titleLabel" wrapText="true" style="-fx-font-weight: bold; -fx-font-size: 15px;"/>
+            <Label fx:id="metaLabel" wrapText="true"/>
+            <Label text="Questions:" style="-fx-font-weight: bold;"/>
+            <ScrollPane fitToWidth="true" prefHeight="420" styleClass="card">
+                <VBox fx:id="questionsBox" spacing="14" style="-fx-padding: 10;"/>
+            </ScrollPane>
+            <Label fx:id="totalLabel" wrapText="true" style="-fx-font-weight: bold;"/>
+        </VBox>
+    </center>
+
+    <bottom>
+        <HBox alignment="CENTER_RIGHT" spacing="8" style="-fx-padding: 10 12 12 12;">
+            <Button fx:id="closeButton" onAction="#handleClose" text="Close" styleClass="action-button"/>
+        </HBox>
+    </bottom>
+
+</BorderPane>

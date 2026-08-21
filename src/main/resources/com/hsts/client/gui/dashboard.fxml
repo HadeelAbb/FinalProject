@@ -45,6 +45,8 @@
                         maxWidth="Infinity" styleClass="action-button"/>
                 <Button fx:id="gradeExamsButton" onAction="#handleGradeExams" text="Grade submitted exams"
                         maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="examResultsButton" onAction="#handleExamResults" text="View exam results"
+                        maxWidth="Infinity" styleClass="action-button"/>
                 <Button fx:id="extendTimeButton" onAction="#handleExtendTime" text="Manage exam executions &amp; time"
                         maxWidth="Infinity" styleClass="action-button"/>
                 <Button fx:id="myResultsButton" onAction="#handleMyResults" text="View my results"
@@ -64,6 +66,10 @@
                 <Label text="Principal" styleClass="section-label"/>
                 <Separator/>
                 <Button fx:id="principalOverviewButton" onAction="#handlePrincipalOverview" text="View all exams and results"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="principalComparisonButton" onAction="#handlePrincipalComparison" text="Comparison Reports"
+                        maxWidth="Infinity" styleClass="action-button"/>
+                <Button fx:id="principalQuestionBankButton" onAction="#handlePrincipalQuestionBank" text="Question Bank"
                         maxWidth="Infinity" styleClass="action-button"/>
             </VBox>
 

@@ -17,6 +17,7 @@ public class EditQuestionData implements Serializable {
     private Difficulty difficulty;
     private String topic;
     private String imagePath;
+    private byte[] imageData;
     private String teacherId;
     private List<QuestionAnswer> answers;
 
@@ -82,6 +83,14 @@ public class EditQuestionData implements Serializable {
 
     public void setImagePath(String imagePath) {
         this.imagePath = imagePath;
+    }
+
+    public byte[] getImageData() {
+        return imageData;
+    }
+
+    public void setImageData(byte[] imageData) {
+        this.imageData = imageData;
     }
 
     public String getTeacherId() {

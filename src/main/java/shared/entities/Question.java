@@ -11,6 +11,13 @@ public class Question {
     private String instructions;
     private String difficulty;
     private String topic;
+    private String imageFilename;
+    private byte[] imageData;
+
+    private String courseId;
+    private String rootQuestionId;
+    private int versionNumber = 1;
+    private boolean latest = true;
 
     // NEW FIELD: Internal storage collection to hold the linked multiple-choice options
     private java.util.List<String> answers = new java.util.ArrayList<>();
@@ -27,6 +34,9 @@ public class Question {
         this.instructions = instructions;
         this.difficulty = difficulty;
         this.topic = topic;
+        this.rootQuestionId = questionId;
+        this.versionNumber = 1;
+        this.latest = true;
     }
 
     // 3. Getters and Setters: Required so Partner 2 can read the data to send it over the network,
@@ -45,6 +55,26 @@ public class Question {
 
     public String getTopic() { return topic; }
     public void setTopic(String topic) { this.topic = topic; }
+
+    public String getImageFilename() { return imageFilename; }
+    public void setImageFilename(String imageFilename) { this.imageFilename = imageFilename; }
+
+    public byte[] getImageData() { return imageData; }
+    public void setImageData(byte[] imageData) { this.imageData = imageData; }
+
+    public String getCourseId() { return courseId; }
+    public void setCourseId(String courseId) { this.courseId = courseId; }
+
+    public String getRootQuestionId() {
+        return rootQuestionId != null && !rootQuestionId.isBlank() ? rootQuestionId : questionId;
+    }
+    public void setRootQuestionId(String rootQuestionId) { this.rootQuestionId = rootQuestionId; }
+
+    public int getVersionNumber() { return versionNumber <= 0 ? 1 : versionNumber; }
+    public void setVersionNumber(int versionNumber) { this.versionNumber = versionNumber; }
+
+    public boolean isLatest() { return latest; }
+    public void setLatest(boolean latest) { this.latest = latest; }
 
     // NEW METHODS: Added to pass answer collections smoothly across the 3-Tier bridge
     public java.util.List<String> getAnswers() { return answers; }

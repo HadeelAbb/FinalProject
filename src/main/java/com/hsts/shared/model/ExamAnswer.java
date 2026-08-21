@@ -154,9 +154,11 @@ public class ExamAnswer implements Serializable {
         return gradeConfirmed && finalScore != null ? finalScore : autoScore;
     }
 
+
     @Override
     public String toString() {
+        Double score = getDisplayScore();
         return "Exam " + examId + " - student " + studentId
-                + (autoScore != null ? " (auto score: " + autoScore + ")" : "");
+                + (score != null ? " (score: " + score + ")" : "");
     }
 }

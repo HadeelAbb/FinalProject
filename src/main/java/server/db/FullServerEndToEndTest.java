@@ -92,7 +92,9 @@ public class FullServerEndToEndTest extends AbstractClient {
                     "CS101",                        // courseId
                     "Network Architecture Midterm", // title
                     "Answer all questions.",        // instructionsForStudents
+                    null,
                     List.of("11001", "11002"),      // questionIds
+                    java.util.Map.of("11001", 50, "11002", 50),
                     45                              // durationMinutes
             );
 

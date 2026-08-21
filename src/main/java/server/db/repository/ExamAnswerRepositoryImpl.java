@@ -1,6 +1,7 @@
 package server.db.repository;
 
 import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.model.ExamStatisticsCalculator;
 import com.hsts.shared.model.ExamStats;
 import server.db.DatabaseManager;
 
@@ -179,36 +180,8 @@ public class ExamAnswerRepositoryImpl {
             return Optional.empty();
         }
 
-        if (scores.isEmpty()) {
-            return Optional.empty(); // No confirmed grades available yet
-        }
-
-        int total = scores.size();
-
-        // 1. Calculate Mean
-        double sum = 0;
-        for (double s : scores) sum += s;
-        double mean = Math.round((sum / total) * 100.0) / 100.0;
-
-        // 2. Calculate Median
-        double median;
-        if (total % 2 == 1) {
-            median = scores.get(total / 2);
-        } else {
-            median = (scores.get((total / 2) - 1) + scores.get(total / 2)) / 2.0;
-        }
-        median = Math.round(median * 100.0) / 100.0;
-
-        // 3. Calculate Decile Distribution (0-9, 10-19, ..., 90-100)
-        int[] deciles = new int[10];
-        for (double score : scores) {
-            int index = (int) (score / 10.0);
-            if (index >= 10) index = 9; // Handle score == 100.0
-            if (index < 0) index = 0;
-            deciles[index]++;
-        }
-
-        return Optional.of(new ExamStats(examId, total, mean, median, deciles));
+        ExamStats stats = ExamStatisticsCalculator.toExamStats(examId, scores);
+        return stats != null ? Optional.of(stats) : Optional.empty();
     }
 
     /** All answers a student has submitted (used for "already taken" checks and SUC-10 results). */
@@ -251,6 +224,36 @@ public class ExamAnswerRepositoryImpl {
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, teacherId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getString("exam_answer_id"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+
+        List<ExamAnswer> results = new ArrayList<>();
+        for (String id : ids) {
+            findById(id).ifPresent(results::add);
+        }
+        return results;
+    }
+
+    /**
+     * All submitted attempts for one exam (pending and confirmed).
+     * In-progress sittings that were never submitted are not included.
+     */
+    public List<ExamAnswer> findSubmittedByExamId(String examId) {
+        String sql = "SELECT exam_answer_id FROM exam_answers WHERE exam_id = ? AND submitted_at IS NOT NULL "
+                + "ORDER BY submitted_at ASC";
+        List<String> ids = new ArrayList<>();
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return new ArrayList<>();
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, examId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     ids.add(rs.getString("exam_answer_id"));

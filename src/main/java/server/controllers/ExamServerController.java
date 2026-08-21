@@ -21,41 +21,74 @@ public class ExamServerController {
     private final ExamAnswerRepositoryImpl answerRepository = new ExamAnswerRepositoryImpl();
     private final server.db.repository.ExamExecutionRepositoryImpl executionRepository = new server.db.repository.ExamExecutionRepositoryImpl();
     private final DatabaseManager dbManager = DatabaseManager.getInstance();
+    private final ActiveExamTracker activeExamTracker = new ActiveExamTracker();
 
     // SUC-2: Manual Exam Creation
     public Exam createManualExam(CreateExamManualData data) {
-        // R11: teacher can only build exams for courses she teaches
+        return tryCreateManualExam(data).exam;
+    }
+
+    public CreateExamResult tryCreateManualExam(CreateExamManualData data) {
         if (!isTeacherAssignedToCourse(data.getTeacherId(), data.getCourseId())) {
             System.err.println("Create-exam rejected: teacher " + data.getTeacherId()
                     + " does not teach course " + data.getCourseId());
-            return null;
+            return CreateExamResult.fail("You don't have permission to build exams for this course.");
+        }
+
+        String pointsError = ExamQuestionPointsValidator.validate(data.getQuestionIds(), data.getQuestionPoints());
+        if (pointsError != null) {
+            return CreateExamResult.fail(pointsError);
         }
 
         String newExamId = "E" + (System.currentTimeMillis() % 100000);
         List<Question> selectedQuestions = fetchQuestionsByIds(data.getQuestionIds());
+        if (selectedQuestions.size() != data.getQuestionIds().size()) {
+            return CreateExamResult.fail("One or more selected questions no longer exist.");
+        }
+        for (Question question : selectedQuestions) {
+            question.setPoints(data.getQuestionPoints().get(question.getQuestionId()));
+        }
 
         Exam exam = new Exam(newExamId, data.getCourseId(), data.getTitle(),
                 data.getInstructionsForStudents(), selectedQuestions, data.getDurationMinutes(), data.getTeacherId());
         exam.setStatus(ExamStatus.DRAFT);
         exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
+        exam.setRootExamId(newExamId);
+        exam.setVersionNumber(1);
+        exam.setLatest(true);
 
-        return examRepository.save(exam) ? exam : null;
+        return examRepository.save(exam)
+                ? CreateExamResult.ok(exam)
+                : CreateExamResult.fail("Failed to create manual exam.");
     }
 
     // SUC-3: Auto Exam Creation by Topic & Difficulty
     public Exam createAutoExam(CreateExamAutoData data) {
-        // R11: teacher can only build exams for courses she teaches
+        return tryCreateAutoExam(data).exam;
+    }
+
+    public CreateExamResult tryCreateAutoExam(CreateExamAutoData data) {
         if (!isTeacherAssignedToCourse(data.getTeacherId(), data.getCourseId())) {
             System.err.println("Create-exam rejected: teacher " + data.getTeacherId()
                     + " does not teach course " + data.getCourseId());
-            return null;
+            return CreateExamResult.fail("You don't have permission to build exams for this course.");
+        }
+
+        String splitError = ExamQuestionPointsValidator.validateEqualSplit(data.getNumberOfQuestions());
+        if (splitError != null) {
+            return CreateExamResult.fail(splitError);
         }
 
         List<Question> matchingQuestions = fetchMatchingQuestions(
                 data.getCourseId(), data.getTopic(), data.getDifficulty(), data.getNumberOfQuestions());
 
         if (matchingQuestions.size() < data.getNumberOfQuestions()) {
-            return null; // Insufficient matching pool
+            return CreateExamResult.fail("Insufficient matching questions for criteria.");
+        }
+
+        int pointsEach = ExamQuestionPointsValidator.equalSplitPoints(matchingQuestions.size());
+        for (Question question : matchingQuestions) {
+            question.setPoints(pointsEach);
         }
 
         String newExamId = "E" + (System.currentTimeMillis() % 100000);
@@ -63,8 +96,106 @@ public class ExamServerController {
                 data.getInstructionsForStudents(), matchingQuestions, data.getDurationMinutes(), data.getTeacherId());
         exam.setStatus(ExamStatus.DRAFT);
         exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
+        exam.setRootExamId(newExamId);
+        exam.setVersionNumber(1);
+        exam.setLatest(true);
 
-        return examRepository.save(exam) ? exam : null;
+        return examRepository.save(exam)
+                ? CreateExamResult.ok(exam)
+                : CreateExamResult.fail("Failed to create automatic exam.");
+    }
+
+    public static final class CreateExamResult {
+        public final Exam exam;
+        public final String errorMessage;
+
+        private CreateExamResult(Exam exam, String errorMessage) {
+            this.exam = exam;
+            this.errorMessage = errorMessage;
+        }
+
+        public static CreateExamResult ok(Exam exam) {
+            return new CreateExamResult(exam, null);
+        }
+
+        public static CreateExamResult fail(String errorMessage) {
+            return new CreateExamResult(null, errorMessage);
+        }
+    }
+
+    public CreateExamResult tryCreateExamVersion(CreateExamVersionData data) {
+        if (data == null || data.getSourceExamId() == null || data.getSourceExamId().isBlank()) {
+            return CreateExamResult.fail(ExamVersioning.SOURCE_NOT_FOUND);
+        }
+        String titleError = ExamVersioning.validateTitle(data.getTitle());
+        if (titleError != null) {
+            return CreateExamResult.fail(titleError);
+        }
+        String durationError = ExamVersioning.validateDuration(data.getDurationMinutes());
+        if (durationError != null) {
+            return CreateExamResult.fail(durationError);
+        }
+
+        Optional<Exam> sourceOpt = examRepository.findById(data.getSourceExamId());
+        if (sourceOpt.isEmpty()) {
+            return CreateExamResult.fail(ExamVersioning.SOURCE_NOT_FOUND);
+        }
+        Exam source = sourceOpt.get();
+
+        if (data.getTeacherId() == null || !data.getTeacherId().equals(source.getCreatedByTeacherId())) {
+            return CreateExamResult.fail(RequestAuthorizer.NOT_AUTHORIZED);
+        }
+        if (!isTeacherAssignedToCourse(data.getTeacherId(), source.getCourseId())) {
+            return CreateExamResult.fail("You don't have permission to build exams for this course.");
+        }
+        if (!source.isLatest()) {
+            return CreateExamResult.fail(ExamVersioning.HISTORICAL_NOT_EDITABLE);
+        }
+
+        String pointsError = ExamQuestionPointsValidator.validate(data.getQuestionIds(), data.getQuestionPoints());
+        if (pointsError != null) {
+            return CreateExamResult.fail(pointsError);
+        }
+
+        List<Question> selectedQuestions = fetchQuestionsByIds(data.getQuestionIds());
+        if (selectedQuestions.size() != data.getQuestionIds().size()) {
+            return CreateExamResult.fail("One or more selected questions no longer exist.");
+        }
+
+        String latestError = ExamVersioning.validateNewlyAddedQuestionsAreLatest(
+                ExamVersioning.physicalQuestionIds(source), selectedQuestions);
+        if (latestError != null) {
+            return CreateExamResult.fail(latestError);
+        }
+
+        for (Question question : selectedQuestions) {
+            question.setPoints(data.getQuestionPoints().get(question.getQuestionId()));
+        }
+
+        String newExamId = allocateExamId();
+        Exam exam = new Exam(newExamId, source.getCourseId(), data.getTitle(),
+                data.getInstructionsForStudents(), selectedQuestions, data.getDurationMinutes(),
+                source.getCreatedByTeacherId());
+        exam.setStatus(ExamStatus.DRAFT);
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
+        exam.setRootExamId(source.getRootExamId());
+        exam.setLatest(true);
+
+        String saveError = examRepository.saveAsNewVersion(exam, source.getExamId());
+        if (saveError != null) {
+            return CreateExamResult.fail(saveError);
+        }
+        return CreateExamResult.ok(exam);
+    }
+
+    private String allocateExamId() {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            String id = "E" + ((System.currentTimeMillis() + attempt * 37L) % 100000);
+            if (examRepository.findById(id).isEmpty()) {
+                return id;
+            }
+        }
+        return "E" + (System.nanoTime() % 100000);
     }
 
     // R04/R11: whether a teacher is assigned to teach a given course.
@@ -108,15 +239,15 @@ public class ExamServerController {
         return null;
     }
 
-    private LocalDateTime parseOrDefault(String text, java.time.format.DateTimeFormatter fmt, LocalDateTime fallback) {
+    private LocalDateTime parseRequired(String text, java.time.format.DateTimeFormatter fmt) {
         if (text == null || text.isBlank()) {
-            return fallback;
+            return null;
         }
         try {
             return LocalDateTime.parse(text.trim(), fmt);
         } catch (Exception e) {
-            System.err.println("Could not parse date '" + text + "' (expected dd-MM-yyyy HH:mm) - using default instead.");
-            return fallback;
+            System.err.println("Could not parse date '" + text + "' (expected dd-MM-yyyy HH:mm).");
+            return null;
         }
     }
 
@@ -178,14 +309,36 @@ public class ExamServerController {
             return null;
         }
 
-        // SUC-17: apply any extra minutes already granted to THIS execution - in-memory
-        // only (not persisted back to the exam's own row), so it affects this student's
-        // timer without permanently changing the exam's stored duration.
-        if (execution.getExtraMinutesGranted() > 0) {
-            exam.setDurationMinutes(exam.getDurationMinutes() + execution.getExtraMinutesGranted());
+        // Personal timer starts at THIS student's first successful START for this
+        // execution, not at ExamExecution.scheduled_start. A later START of the
+        // same execution resumes the original startedAt instead of resetting it.
+        // Extra minutes are applied to remaining time without changing the stored
+        // exam duration row.
+        ActiveExamTracker.ActiveSitting sitting = activeExamTracker.markStarted(
+                data.getStudentId(),
+                exam.getCourseId(),
+                exam.getExamId(),
+                execution.getExecutionId(),
+                now);
+        if (sitting == null) {
+            System.err.println("Start rejected: could not record active sitting.");
+            return null;
         }
+        int remainingSeconds = ActiveExamTracker.remainingSeconds(
+                sitting.getStartedAt(),
+                exam.getDurationMinutes(),
+                execution.getExtraMinutesGranted(),
+                now);
+        exam.setRemainingSeconds(remainingSeconds);
+        System.out.println("[EXAM-LOCK] " + data.getStudentId()
+                + (sitting.getStartedAt() != now ? " resume: " : " marked active: ")
+                + "exam=" + exam.getExamId()
+                + " execution=" + execution.getExecutionId()
+                + " course=" + exam.getCourseId()
+                + " startedAt=" + sitting.getStartedAt()
+                + " remainingSeconds=" + remainingSeconds);
 
-        return exam; // Execution code verified; return exam payload
+        return exam;
     }
 
     // SUC-6: Submit Exam & Auto-Grade Multiple Choice Options
@@ -229,21 +382,14 @@ public class ExamServerController {
             }
         }
 
-        double earnedPoints = 0.0;
-        int totalQuestions = exam.getQuestions() != null ? exam.getQuestions().size() : 0;
-        double pointsPerQuestion = totalQuestions > 0 ? (100.0 / totalQuestions) : 0.0;
-
-        // Auto-grading routine
-        if (exam.getQuestions() != null && data.getSelectedAnswers() != null) {
+        java.util.Map<String, String> officialCorrect = new java.util.HashMap<>();
+        if (exam.getQuestions() != null) {
             for (Question q : exam.getQuestions()) {
-                String studentSelected = data.getSelectedAnswers().get(q.getQuestionId());
-                String correctAnswer = fetchCorrectAnswerForQuestion(q.getQuestionId());
-
-                if (studentSelected != null && studentSelected.trim().equalsIgnoreCase(correctAnswer != null ? correctAnswer.trim() : "")) {
-                    earnedPoints += pointsPerQuestion;
-                }
+                officialCorrect.put(q.getQuestionId(), fetchCorrectAnswerForQuestion(q.getQuestionId()));
             }
         }
+        double earnedPoints = ExamQuestionPointsValidator.grade(
+                exam.getQuestions(), data.getSelectedAnswers(), officialCorrect);
 
         String newAnswerId = "EA" + (System.currentTimeMillis() % 100000);
         ExamAnswer answer = new ExamAnswer(newAnswerId, data.getExamId(), data.getStudentId());
@@ -255,34 +401,37 @@ public class ExamServerController {
         answer.setFinalScore(earnedPoints); // Default until overridden by teacher
         answer.setGradeConfirmed(false);
 
-        return answerRepository.save(answer) ? answer : null;
+        if (!answerRepository.save(answer)) {
+            return null;
+        }
+
+        // Unlock the bot only after the submission row is actually persisted.
+        activeExamTracker.clearByExam(data.getStudentId(), data.getExamId());
+        System.out.println("[EXAM-LOCK] " + data.getStudentId()
+                + " cleared after submit: exam=" + data.getExamId()
+                + " course=" + exam.getCourseId());
+        return answer;
     }
-    // SUC-6: Retrieve Approved Exam Directly by 4-Character Execution Code
+    // SUC-6: resolve a 4-character code through exam_executions, then load the approved exam.
+    // Production student entry must not depend on the leftover exams.execution_code column.
     public Exam getExamByExecutionCode(String executionCode) {
-        if (executionCode == null || executionCode.trim().length() != 4) {
+        if (ExamExecutionCreateValidator.validateExecutionCode(executionCode) != null) {
             System.err.println("[EXAM-SERVER] Invalid execution code format.");
             return null;
         }
 
-        String sql = "SELECT exam_id FROM exams WHERE LOWER(execution_code) = LOWER(?) AND status = 'APPROVED'";
-        Connection conn = dbManager.getConnection();
-        if (conn == null) return null;
+        Optional<com.hsts.shared.model.ExamExecution> executionOpt =
+                executionRepository.findByCode(executionCode.trim());
+        if (executionOpt.isEmpty()) {
+            System.err.println("[EXAM-SERVER] No exam_executions row for code: " + executionCode);
+            return null;
+        }
 
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, executionCode.trim());
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    String examId = rs.getString("exam_id");
-                    Optional<Exam> optExam = examRepository.findById(examId);
-                    if (optExam.isPresent()) {
-                        System.out.println("[EXAM-SERVER] Successfully fetched exam [" + examId + "] via code: " + executionCode);
-                        return optExam.get();
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("[EXAM-SERVER ERROR] Failed to fetch exam by execution code: " + e.getMessage());
-            e.printStackTrace();
+        Optional<Exam> optExam = examRepository.findById(executionOpt.get().getExamId());
+        if (optExam.isPresent() && optExam.get().getStatus() == ExamStatus.APPROVED) {
+            System.out.println("[EXAM-SERVER] Fetched exam [" + optExam.get().getExamId()
+                    + "] via exam_executions code: " + executionCode);
+            return optExam.get();
         }
 
         System.err.println("[EXAM-SERVER] No approved exam found for execution code: " + executionCode);
@@ -298,10 +447,21 @@ public class ExamServerController {
             return "That submission could not be found.";
         }
         ExamAnswer answer = opt.get();
-
-        // R85: manual override can't exceed the exam's total points
-        double finalScore = data.getFinalScore();
         Optional<Exam> examOpt = examRepository.findById(answer.getExamId());
+
+        if (data.getTeacherId() != null && examOpt.isPresent()
+                && examOpt.get().getCreatedByTeacherId() != null
+                && !data.getTeacherId().equals(examOpt.get().getCreatedByTeacherId())) {
+            return RequestAuthorizer.NOT_AUTHORIZED;
+        }
+
+        String reasonError = GradeChangeReasonValidator.validate(
+                answer.getAutoScore(), data.getFinalScore(), data.getTeacherComment());
+        if (reasonError != null) {
+            return reasonError;
+        }
+
+        double finalScore = data.getFinalScore();
         if (examOpt.isPresent()) {
             int maxPoints = examOpt.get().totalPoints();
             if (finalScore > maxPoints) {
@@ -321,6 +481,10 @@ public class ExamServerController {
         return answerRepository.update(answer) ? null : "Database update failed - please try again.";
     }
 
+    public Optional<ExamAnswer> findExamAnswerById(String examAnswerId) {
+        return answerRepository.findById(examAnswerId);
+    }
+
     // Backward-compatible boolean version, for anything still calling the old signature.
     public boolean confirmGrade(ConfirmGradeData data) {
         return confirmGradeWithReason(data) == null;
@@ -333,13 +497,32 @@ public class ExamServerController {
 
     // SUC-4: Submit a draft (or previously-rejected) exam for coordinator approval
     public Exam submitForApproval(String examId) {
+        return submitForApproval(examId, null);
+    }
+
+    public Exam submitForApproval(String examId, String teacherId) {
         Optional<Exam> opt = examRepository.findById(examId);
         if (opt.isEmpty()) {
             return null;
         }
         Exam exam = opt.get();
+        if (teacherId != null && exam.getCreatedByTeacherId() != null
+                && !teacherId.equals(exam.getCreatedByTeacherId())) {
+            System.err.println("Submit-for-approval rejected: " + teacherId
+                    + " did not create exam " + examId);
+            return null;
+        }
+        if (!exam.isLatest()) {
+            System.err.println("Submit-for-approval rejected: exam " + examId + " is not the current version.");
+            return null;
+        }
         if (exam.getStatus() != ExamStatus.DRAFT && exam.getStatus() != ExamStatus.REJECTED) {
             System.err.println("Submit-for-approval rejected: exam " + examId + " is not a draft or rejected exam.");
+            return null;
+        }
+        String pointsError = ExamQuestionPointsValidator.validateQuestions(exam.getQuestions());
+        if (pointsError != null) {
+            System.err.println("Submit-for-approval rejected: " + pointsError);
             return null;
         }
         exam.setStatus(ExamStatus.PENDING_APPROVAL);
@@ -374,38 +557,97 @@ public class ExamServerController {
         return answerRepository.getExamStats(examId);
     }
 
-    // SUC 2.2: a teacher opens ANOTHER execution (sitting) of an already-approved exam.
-    // Any teacher may do this, not just the exam's original author (spec 7.2 explicitly
-    // allows performance by other teachers). Rejects if the exam isn't approved yet.
-    // Per 3.5: open/close dates are mandatory for every execution.
+    // SUC 7.3 / requirement 12: Principal comparison of related exams (confirmed grades only)
+    public PrincipalComparisonReport getPrincipalComparisonReport(PrincipalReportType type, String filterValue) {
+        return PrincipalReportAssembler.assemble(type, filterValue, examRepository.findAll(),
+                answerRepository.findAllConfirmed());
+    }
+
+    // SUC 2.2: a teacher opens ANOTHER execution (sitting) of an already-approved exam
+    // that they created. Spec 7.2 in this codebase is about exam statistics for
+    // authorized viewers, not a license for any teacher to operate another teacher's
+    // exam. The GUI lists GET_MY_EXAMS only; the server must enforce the same ownership.
     public com.hsts.shared.model.ExamExecution createExecution(String examId, String teacherId,
-                                                               String scheduledStartText, String scheduledEndText) {
+                                                               String scheduledStartText, String scheduledEndText,
+                                                               String executionCode) {
+        CreateExecutionResult result = tryCreateExecution(examId, teacherId, scheduledStartText, scheduledEndText,
+                executionCode);
+        return result.execution;
+    }
+
+    /**
+     * Same as createExecution, but returns a specific failure message for the OCSF client.
+     */
+    public CreateExecutionResult tryCreateExecution(String examId, String teacherId,
+                                                    String scheduledStartText, String scheduledEndText,
+                                                    String executionCode) {
         Optional<Exam> opt = examRepository.findById(examId);
-        if (opt.isEmpty() || opt.get().getStatus() != ExamStatus.APPROVED) {
-            System.err.println("Create-execution rejected: exam " + examId + " is not approved.");
-            return null;
+        if (opt.isEmpty()) {
+            return CreateExecutionResult.fail("Exam not found.");
+        }
+        Exam exam = opt.get();
+        String ownerError = ExamResultsAccess.denyIfNotOwner(exam, teacherId);
+        if (ownerError != null) {
+            return CreateExecutionResult.fail(ExamResultsAccess.NOT_FOUND.equals(ownerError)
+                    ? ExamResultsAccess.NOT_FOUND
+                    : ExamResultsAccess.ACCESS_DENIED);
+        }
+        String approvedError = ExamExecutionCreateValidator.validateApproved(exam.getStatus());
+        if (approvedError != null) {
+            return CreateExecutionResult.fail(approvedError);
         }
 
         if (scheduledStartText == null || scheduledStartText.isBlank()
                 || scheduledEndText == null || scheduledEndText.isBlank()) {
-            System.err.println("Create-execution rejected: open/close dates are required.");
-            return null;
+            return CreateExecutionResult.fail("Opening and closing times are required.");
         }
 
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
-        LocalDateTime start = parseOrDefault(scheduledStartText, fmt, LocalDateTime.now());
-        LocalDateTime end = parseOrDefault(scheduledEndText, fmt, start.plusDays(14));
+        LocalDateTime start = parseRequired(scheduledStartText, fmt);
+        LocalDateTime end = parseRequired(scheduledEndText, fmt);
+        if (start == null || end == null) {
+            return CreateExecutionResult.fail("Opening and closing times must use the format dd-MM-yyyy HH:mm.");
+        }
 
-        // R75: close date must be after open date
-        if (!end.isAfter(start)) {
-            System.err.println("Create-execution rejected: close date must be after open date.");
-            return null;
+        String windowError = ExamExecutionCreateValidator.validateWindow(start, end);
+        if (windowError != null) {
+            return CreateExecutionResult.fail(windowError);
+        }
+
+        String codeError = ExamExecutionCreateValidator.validateExecutionCode(executionCode);
+        if (codeError != null) {
+            return CreateExecutionResult.fail(codeError);
+        }
+        String code = ExamExecutionCreateValidator.normalizeExecutionCode(executionCode);
+        if (!executionRepository.findByCode(code).isEmpty()) {
+            return CreateExecutionResult.fail("Execution code is already in use.");
         }
 
         String executionId = "EX" + (System.currentTimeMillis() % 100000);
         com.hsts.shared.model.ExamExecution execution = new com.hsts.shared.model.ExamExecution(
-                executionId, examId, generateExecutionCode(), start, end, teacherId);
-        return executionRepository.save(execution) ? execution : null;
+                executionId, examId, code, start, end, teacherId);
+        if (!executionRepository.save(execution)) {
+            return CreateExecutionResult.fail("Execution code is already in use.");
+        }
+        return CreateExecutionResult.ok(execution);
+    }
+
+    public static final class CreateExecutionResult {
+        public final com.hsts.shared.model.ExamExecution execution;
+        public final String errorMessage;
+
+        private CreateExecutionResult(com.hsts.shared.model.ExamExecution execution, String errorMessage) {
+            this.execution = execution;
+            this.errorMessage = errorMessage;
+        }
+
+        public static CreateExecutionResult ok(com.hsts.shared.model.ExamExecution execution) {
+            return new CreateExecutionResult(execution, null);
+        }
+
+        public static CreateExecutionResult fail(String errorMessage) {
+            return new CreateExecutionResult(null, errorMessage);
+        }
     }
 
     // Section 4: every execution (past and present) this exam has ever had.
@@ -416,6 +658,13 @@ public class ExamServerController {
     // Section 4: started/finished/timed-out counts for one specific execution.
     public com.hsts.shared.model.ExecutionStats getExecutionStats(String executionId) {
         return answerRepository.getExecutionStats(executionId);
+    }
+
+    public java.util.Optional<com.hsts.shared.model.ExamExecution> findExecutionById(String executionId) {
+        if (executionId == null || executionId.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        return executionRepository.findById(executionId);
     }
 
     // SUC-4: exams currently waiting on a coordinator's decision
@@ -471,6 +720,10 @@ public class ExamServerController {
         return false;
     }
 
+    public boolean hasActiveExamInCourse(String studentId, String courseId) {
+        return activeExamTracker.isActiveInCourse(studentId, courseId);
+    }
+
     // SUC 6.2: whether a student is registered for a given course - now enforced
     // for both exam availability and the study bot.
     public boolean isStudentEnrolled(String studentId, String courseId) {
@@ -495,6 +748,20 @@ public class ExamServerController {
     // SUC-9: a teacher's grading queue - submitted answers not yet confirmed, for exams they created
     public List<ExamAnswer> getPendingGrading(String teacherId) {
         return answerRepository.findPendingGradingForTeacher(teacherId);
+    }
+
+    /**
+     * Submitted results for one exam, only if {@code teacherId} created that exam.
+     * Returns an empty list when the exam exists and is owned but has no submissions.
+     * Returns null when the exam is missing or not owned by this teacher.
+     */
+    public List<ExamAnswer> getExamResults(String examId, String teacherId) {
+        Optional<Exam> opt = examRepository.findById(examId);
+        Exam exam = opt.orElse(null);
+        if (ExamResultsAccess.denyIfNotOwner(exam, teacherId) != null) {
+            return null;
+        }
+        return answerRepository.findSubmittedByExamId(examId);
     }
 
     // SUC-10: a student's own confirmed results
@@ -530,11 +797,18 @@ public class ExamServerController {
     // SUC-17: a teacher extends the time for a SPECIFIC execution (spec: temporary,
     // applies only to this run, never changes the exam's base definition). Persisted
     // on the execution itself, so it applies to anyone taking this execution from now
-    // on - not just students already connected the instant this is called. Any teacher
-    // may do this, matching createExecution's permissiveness (spec 7.2).
-    public com.hsts.shared.model.ExamExecution extendExecutionTime(String executionId, int additionalMinutes) {
+    // on - not just students already connected the instant this is called.
+    // Only the teacher who created the exam may extend; spec 7.2 is exam statistics,
+    // not cross-teacher execution control. Ownership is enforced from the
+    // authenticated session (execution → exam → createdByTeacherId).
+    public com.hsts.shared.model.ExamExecution extendExecutionTime(String executionId, String teacherId,
+                                                                  int additionalMinutes) {
         Optional<com.hsts.shared.model.ExamExecution> opt = executionRepository.findById(executionId);
         if (opt.isEmpty()) {
+            return null;
+        }
+        Optional<Exam> exam = examRepository.findById(opt.get().getExamId());
+        if (ExamResultsAccess.denyIfNotOwner(exam.orElse(null), teacherId) != null) {
             return null;
         }
         boolean ok = executionRepository.addExtraMinutes(executionId, additionalMinutes);
@@ -561,13 +835,23 @@ public class ExamServerController {
 
     // Helpers
     private String generateExecutionCode() {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        String chars = ExamExecutionCreateValidator.CODE_ALPHABET;
         StringBuilder code = new StringBuilder();
         java.util.Random rnd = new java.util.Random();
         for (int i = 0; i < 4; i++) {
             code.append(chars.charAt(rnd.nextInt(chars.length())));
         }
         return code.toString();
+    }
+
+    private String generateUniqueExecutionCode() {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            String code = generateExecutionCode();
+            if (executionRepository.findByCode(code).isEmpty()) {
+                return code;
+            }
+        }
+        return null;
     }
     private boolean hasStudentAlreadySubmitted(String studentId, String examId) {
         String sql = "SELECT COUNT(*) FROM exam_answers WHERE student_id = ? AND exam_id = ?";
@@ -596,6 +880,7 @@ public class ExamServerController {
                 "LEFT JOIN courses c ON q.course_id = c.course_id WHERE q.question_id = ?";
         Connection conn = dbManager.getConnection();
         if (conn == null) return list;
+        QuestionServerController.ensureVersionColumns(conn);
 
         for (String qId : ids) {
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -609,6 +894,12 @@ public class ExamServerController {
                         q.setInstructions(rs.getString("instructions"));
                         q.setTopic(rs.getString("topic"));
                         q.setCourseId(rs.getString("course_id"));
+                        String rootQuestionId = rs.getString("root_question_id");
+                        q.setRootQuestionId(rootQuestionId);
+                        int qVersion = rs.getInt("version_number");
+                        q.setVersionNumber(rs.wasNull() || qVersion < 1 ? 1 : qVersion);
+                        q.setLatest(rs.getInt("is_latest") == 1);
+                        QuestionIllustration.apply(q, rs.getBytes("image_data"), rs.getString("image_filename"));
                         list.add(q);
                     }
                 }
@@ -621,7 +912,7 @@ public class ExamServerController {
 
     private List<Question> fetchMatchingQuestions(String courseId, String topic, Difficulty difficulty, int limit) {
         List<Question> list = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT * FROM questions WHERE course_id = ?");
+        StringBuilder sql = new StringBuilder("SELECT * FROM questions WHERE course_id = ? AND is_latest = 1");
 
         if (topic != null && !topic.isBlank()) sql.append(" AND topic LIKE ?");
         if (difficulty != null) sql.append(" AND difficulty = ?");
@@ -629,6 +920,7 @@ public class ExamServerController {
 
         Connection conn = dbManager.getConnection();
         if (conn == null) return list;
+        QuestionServerController.ensureVersionColumns(conn);
 
         try (PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
             int idx = 1;
@@ -646,6 +938,7 @@ public class ExamServerController {
                     q.setInstructions(rs.getString("instructions"));
                     q.setTopic(rs.getString("topic"));
                     q.setCourseId(rs.getString("course_id"));
+                    QuestionIllustration.apply(q, rs.getBytes("image_data"), rs.getString("image_filename"));
                     list.add(q);
                 }
             }

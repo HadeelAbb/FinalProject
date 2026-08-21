@@ -28,6 +28,12 @@
             </HBox>
             <VBox spacing="6" style="-fx-padding: 12 10 10 10;">
                 <HBox alignment="CENTER_LEFT" spacing="8">
+                    <Label text="Existing exam:"/>
+                    <ComboBox fx:id="existingExamSelector" promptText="Select a current exam to edit" prefWidth="360"/>
+                    <Button fx:id="newExamButton" onAction="#handleNewExam" text="New exam" styleClass="action-button"/>
+                </HBox>
+                <Label fx:id="editBanner" wrapText="true"/>
+                <HBox alignment="CENTER_LEFT" spacing="8">
                     <Label text="Course:"/>
                     <ComboBox fx:id="courseSelector" promptText="Select course"/>
                     <Label text="Title:"/>
@@ -46,12 +52,14 @@
     <left>
         <VBox spacing="8" style="-fx-padding: 10;" prefWidth="340">
             <VBox fx:id="manualModeBox" spacing="8">
-                <Label text="Manual mode: check questions to include"/>
+                <Label text="Manual mode: check questions and assign points"/>
                 <ListView fx:id="questionListView" prefHeight="360"/>
+                <Label fx:id="pointsTotalLabel" text="Total: 0 / 100" wrapText="true"/>
             </VBox>
 
             <VBox fx:id="autoModeBox" spacing="8">
                 <Label text="Automatic mode: filter criteria"/>
+                <Label text="Each question gets 100 ÷ count points. Count must divide 100." wrapText="true"/>
                 <HBox spacing="6" alignment="CENTER_LEFT">
                     <Label text="Topic:"/>
                     <TextField fx:id="autoTopicField" prefWidth="120"/>
@@ -76,6 +84,10 @@
 
             <HBox spacing="8">
                 <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)" styleClass="primary-button"/>
+                <Button fx:id="saveVersionButton" onAction="#handleSaveVersion"
+                        text="Save as new version" disable="true" styleClass="primary-button"/>
+                <Button fx:id="reviewDraftButton" onAction="#handleReviewDraft"
+                        text="Review Draft" disable="true" styleClass="action-button"/>
                 <Button fx:id="submitForApprovalButton" onAction="#handleSubmitForApproval"
                         text="Submit for approval" disable="true" styleClass="action-button"/>
             </HBox>

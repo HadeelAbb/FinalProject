@@ -1,6 +1,7 @@
 package com.hsts.server.network;
 
 import ocsf.server.ConnectionToClient;
+import server.controllers.AuthenticatedSession;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -12,8 +13,13 @@ public class ConnectionRegistry {
 
     private final ConcurrentHashMap<String, ConnectionToClient> userIdToConnection = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ConnectionToClient, String> connectionToUserId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ConnectionToClient, String> connectionToRole = new ConcurrentHashMap<>();
 
     public void register(String userId, ConnectionToClient client) {
+        register(userId, null, client);
+    }
+
+    public void register(String userId, String role, ConnectionToClient client) {
         if (userId == null || userId.isBlank() || client == null) {
             return;
         }
@@ -23,9 +29,13 @@ public class ConnectionRegistry {
         ConnectionToClient previousClient = userIdToConnection.put(userId, client);
         if (previousClient != null && previousClient != client) {
             connectionToUserId.remove(previousClient);
+            connectionToRole.remove(previousClient);
         }
 
         connectionToUserId.put(client, userId);
+        if (role != null && !role.isBlank()) {
+            connectionToRole.put(client, role);
+        }
     }
 
     public void unregisterByUserId(String userId) {
@@ -36,6 +46,7 @@ public class ConnectionRegistry {
         ConnectionToClient client = userIdToConnection.remove(userId);
         if (client != null) {
             connectionToUserId.remove(client);
+            connectionToRole.remove(client);
         }
     }
 
@@ -45,6 +56,7 @@ public class ConnectionRegistry {
         }
 
         String userId = connectionToUserId.remove(client);
+        connectionToRole.remove(client);
         if (userId != null) {
             userIdToConnection.remove(userId, client);
         }
@@ -62,5 +74,13 @@ public class ConnectionRegistry {
             return null;
         }
         return connectionToUserId.get(client);
+    }
+
+    public AuthenticatedSession getSession(ConnectionToClient client) {
+        String userId = getUserId(client);
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        return new AuthenticatedSession(userId, connectionToRole.get(client));
     }
 }

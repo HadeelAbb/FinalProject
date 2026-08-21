@@ -64,7 +64,9 @@ public class ApprovalWindow {
             questionsPreview.getItems().clear();
             return;
         }
-        examDetailsLabel.setText(exam.getTitle() + " (" + exam.getCourseId() + ") - "
+        examDetailsLabel.setText(exam.getExamId() + " — " + exam.getTitle()
+                + " — Version " + exam.getVersionNumber() + " " + exam.versionStatusLabel()
+                + " (" + exam.getCourseId() + ") - "
                 + exam.getDurationMinutes() + " min - by " + exam.getCreatedByTeacherId());
         questionsPreview.getItems().setAll(
                 exam.getQuestions().stream().map(q -> q.toString()).toList());

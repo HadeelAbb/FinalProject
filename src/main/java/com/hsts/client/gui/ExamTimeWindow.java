@@ -39,6 +39,7 @@ public class ExamTimeWindow {
     @FXML private TextField newExecStartTimeField;
     @FXML private DatePicker newExecEndDatePicker;
     @FXML private TextField newExecEndTimeField;
+    @FXML private TextField newExecCodeField;
     @FXML private Button openExecutionButton;
     @FXML private Label executionStatsLabel;
     @FXML private Label statusLabel;
@@ -66,8 +67,9 @@ public class ExamTimeWindow {
             protected void updateItem(Exam exam, boolean empty) {
                 super.updateItem(exam, empty);
                 setText(empty || exam == null ? null
-                        : "[" + exam.getExamId() + "] " + exam.getTitle() + " (" + exam.getStatus() + ") - "
-                          + exam.getDurationMinutes() + " min");
+                        : "[" + exam.getExamId() + "] v" + exam.getVersionNumber() + " "
+                          + exam.versionStatusLabel() + " " + exam.getTitle()
+                          + " (" + exam.getStatus() + ") - " + exam.getDurationMinutes() + " min");
             }
         });
         executionListView.setPlaceholder(new Label("Select an exam to see its executions."));
@@ -186,12 +188,27 @@ public class ExamTimeWindow {
             showError("Close date/time must be after the open date/time.");
             return;
         }
+        String code = newExecCodeField.getText() != null
+                ? newExecCodeField.getText().trim().toUpperCase()
+                : "";
+        if (code.length() != 4) {
+            showError("Execution code must contain exactly 4 characters.");
+            return;
+        }
+        for (int i = 0; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if ((c < 'A' || c > 'Z') && (c < '0' || c > '9')) {
+                showError("Execution code may contain only A-Z and 0-9.");
+                return;
+            }
+        }
         if (!NavigationHelper.confirm("Open a new sitting of \"" + selectedExam.getTitle()
-                + "\"? Students will need a fresh execution code to take this new sitting.")) {
+                + "\" with code " + code
+                + "? Students will need this execution code to take this sitting.")) {
             return;
         }
         openExecutionButton.setDisable(true);
-        controller.createExecution(selectedExam.getExamId(), start, end);
+        controller.createExecution(selectedExam.getExamId(), start, end, code);
     }
 
     public void displayExams(List<Exam> exams) {
@@ -228,6 +245,7 @@ public class ExamTimeWindow {
         newExecStartTimeField.clear();
         newExecEndDatePicker.setValue(null);
         newExecEndTimeField.clear();
+        newExecCodeField.clear();
         statusLabel.setText("New execution opened - code: " + execution.getExecutionCode());
         if (selectedExam != null) {
             controller.loadExecutions(selectedExam.getExamId());

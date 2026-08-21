@@ -20,6 +20,7 @@ import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
@@ -120,7 +121,21 @@ public class ExamTakingWindow {
         executionCodeField.setDisable(true);
         statusLabel.setText("Exam started - answer all questions before time runs out.");
         errorLabel.setText("");
-        startTimer(exam.getDurationMinutes() * 60);
+        int remaining = remainingSecondsFrom(exam);
+        if (remaining <= 0) {
+            timerLabel.setText("Time remaining: 00:00");
+            statusLabel.setText("Exam time has expired - submitting...");
+            doSubmit(true);
+            return;
+        }
+        startTimer(remaining);
+    }
+
+    private int remainingSecondsFrom(Exam exam) {
+        if (exam.getRemainingSeconds() != null) {
+            return exam.getRemainingSeconds();
+        }
+        return Math.max(0, exam.getDurationMinutes()) * 60;
     }
 
     /** Called when the teacher extends time mid-exam (SUC-17) - live push, this run only. */
@@ -212,10 +227,15 @@ public class ExamTakingWindow {
             }
             VBox box = new VBox(4);
             box.setStyle("-fx-padding: 8 0 8 0;");
-            Label text = new Label(question.getText());
+            String pointsText = question.getPoints() > 0 ? " — " + question.getPoints() + " points" : "";
+            Label text = new Label(question.getText() + pointsText);
             text.setWrapText(true);
             text.setStyle("-fx-font-weight: bold;");
             box.getChildren().add(text);
+            ImageView illustration = QuestionIllustrationView.preview(question, 360, 200);
+            if (illustration.getImage() != null) {
+                box.getChildren().add(illustration);
+            }
 
             ToggleGroup group = answerGroups.computeIfAbsent(question.getQuestionId(), id -> new ToggleGroup());
             for (QuestionAnswer answer : question.getAnswers()) {

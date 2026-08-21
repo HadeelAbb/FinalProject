@@ -13,8 +13,10 @@ import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
 import com.hsts.shared.model.ExamStats;
+import com.hsts.shared.model.PrincipalComparisonReport;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.QuestionAnswer;
+import com.hsts.shared.model.QuestionIllustration;
 import com.hsts.shared.model.Principal;
 import com.hsts.shared.model.Teacher;
 import com.hsts.shared.model.User;
@@ -24,6 +26,7 @@ import com.hsts.shared.net.Response;
 import com.hsts.shared.net.dto.ConfirmGradeData;
 import com.hsts.shared.net.dto.CreateExamAutoData;
 import com.hsts.shared.net.dto.CreateExamManualData;
+import com.hsts.shared.net.dto.CreateExamVersionData;
 import com.hsts.shared.net.dto.CreateQuestionData;
 import com.hsts.shared.net.dto.DeleteQuestionData;
 import com.hsts.shared.net.dto.EditQuestionData;
@@ -32,20 +35,28 @@ import com.hsts.shared.net.dto.ExtendExamTimeData;
 import com.hsts.shared.net.dto.GetAvailableExamsData;
 import com.hsts.shared.net.dto.GetExamAnswerCopyData;
 import com.hsts.shared.net.dto.GetExamDetailData;
+import com.hsts.shared.net.dto.GetExamResultsData;
 import com.hsts.shared.net.dto.GetExamStatsData;
 import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.GetMyResultsData;
 import com.hsts.shared.net.dto.GetPendingGradingData;
 import com.hsts.shared.net.dto.LoginData;
 import com.hsts.shared.net.dto.LogoutData;
+import com.hsts.shared.net.dto.PrincipalComparisonReportData;
 import com.hsts.shared.net.dto.SearchQuestionsData;
 import com.hsts.shared.net.dto.StartExamData;
 import com.hsts.shared.net.dto.SubmitExamData;
 import com.hsts.shared.net.dto.SubmitExamForApprovalData;
 import ocsf.server.ConnectionToClient;
+import server.controllers.ActiveExamTracker;
+import server.controllers.AuthenticatedSession;
+import server.controllers.ExamResultsAccess;
 import server.controllers.ExamServerController;
 import server.controllers.LoginServerController;
+import server.controllers.QuestionCreateValidator;
 import server.controllers.QuestionServerController;
+import server.controllers.RequestAuthorizer;
+import server.controllers.RequestIdentityBinder;
 import server.db.DatabaseManager;
 import server.db.repository.BotRepositoryImpl;
 
@@ -98,7 +109,7 @@ public class MainServerApp {
         registerQuestionRoutes(router, questionServerController, server, examServerController);
         registerExamRoutes(router, examServerController, eventBus);
         registerBotRoutes(router, botRepository, examServerController);
-        configureSessionHandling(server, router, loginServerController, connectionRegistry);
+        configureSessionHandling(server, router, loginServerController, connectionRegistry, examServerController);
 
         startServer(server);
     }
@@ -172,19 +183,25 @@ public class MainServerApp {
                         role = "TEACHER";
                     }
 
-                    // Try reading name details safely
-                    String firstName = "User";
-                    String lastName = username;
+                    // init.sql stores a single full_name column (not first_name/last_name).
+                    // Split it for the existing User model so dashboards show the real name.
+                    String[] nameParts = splitFullName(rs.getString("full_name"), username);
+                    String firstName = nameParts[0];
+                    String lastName = nameParts[1];
+
+                    String email = null;
                     try {
-                        if (rs.getString("first_name") != null) firstName = rs.getString("first_name");
-                        if (rs.getString("last_name") != null) lastName = rs.getString("last_name");
-                    } catch (Exception ignored) {}
+                        email = rs.getString("email");
+                    } catch (Exception ignored) {
+                        // email is optional in the schema
+                    }
 
                     if ("STUDENT".equalsIgnoreCase(role)) {
                         com.hsts.shared.model.Student student = new com.hsts.shared.model.Student();
                         student.setId(username);
                         student.setFirstName(firstName);
                         student.setLastName(lastName);
+                        student.setEmail(email);
                         student.setRole("STUDENT");
                         student.setCourses(loadStudentCoursesFromDatabase(username));
                         return student;
@@ -193,6 +210,7 @@ public class MainServerApp {
                         coord.setId(username);
                         coord.setFirstName(firstName);
                         coord.setLastName(lastName);
+                        coord.setEmail(email);
                         coord.setRole("SUBJECT_COORDINATOR");
                         return coord;
                     } else if ("PRINCIPAL".equalsIgnoreCase(role)) {
@@ -200,6 +218,7 @@ public class MainServerApp {
                         principal.setId(username);
                         principal.setFirstName(firstName);
                         principal.setLastName(lastName);
+                        principal.setEmail(email);
                         principal.setRole("PRINCIPAL");
                         return principal;
                     } else {
@@ -207,6 +226,7 @@ public class MainServerApp {
                         teacher.setId(username);
                         teacher.setFirstName(firstName);
                         teacher.setLastName(lastName);
+                        teacher.setEmail(email);
                         teacher.setRole("TEACHER");
                         teacher.setCourses(loadTeacherCoursesFromDatabase(username));
                         return teacher;
@@ -224,6 +244,22 @@ public class MainServerApp {
         fallbackStudent.setLastName("");
         fallbackStudent.setRole("STUDENT");
         return fallbackStudent;
+    }
+
+    /**
+     * Maps DB {@code users.full_name} onto the shared User firstName/lastName fields.
+     * Uses the first whitespace-separated token as first name and the remainder as last name.
+     */
+    private static String[] splitFullName(String fullName, String usernameFallback) {
+        if (fullName == null || fullName.isBlank()) {
+            return new String[]{usernameFallback, ""};
+        }
+        String trimmed = fullName.trim().replaceAll("\\s+", " ");
+        int space = trimmed.indexOf(' ');
+        if (space < 0) {
+            return new String[]{trimmed, ""};
+        }
+        return new String[]{trimmed.substring(0, space), trimmed.substring(space + 1)};
     }
 
     private static Teacher buildAuthenticatedTeacherProfile(String username) {
@@ -334,8 +370,10 @@ public class MainServerApp {
             SearchQuestionsData data = (SearchQuestionsData) request.getPayload();
 
             String courseFilter = data.getCourseId() != null ? data.getCourseId() : DEFAULT_COURSE_ID;
+            String difficulty = data.getDifficulty() != null ? data.getDifficulty().toString() : null;
             List<shared.entities.Question> rawDbResults =
-                    questionServerController.searchQuestions(data.getTopic(), courseFilter);
+                    questionServerController.searchQuestions(
+                            data.getTopic(), courseFilter, difficulty, data.isLatestOnly());
 
             List<Question> formattedGuiResults = new ArrayList<>();
 
@@ -353,6 +391,29 @@ public class MainServerApp {
             );
         });
 
+        router.registerHandler(Command.GET_ALL_QUESTIONS, request -> {
+            SearchQuestionsData data = request.getPayload() instanceof SearchQuestionsData search
+                    ? search : new SearchQuestionsData();
+            String courseFilter = data.getCourseId() != null && !data.getCourseId().isBlank()
+                    ? data.getCourseId() : null;
+            String difficulty = data.getDifficulty() != null ? data.getDifficulty().toString() : null;
+            List<shared.entities.Question> rawDbResults =
+                    questionServerController.searchQuestions(data.getTopic(), courseFilter, difficulty);
+
+            List<Question> formattedGuiResults = new ArrayList<>();
+            if (rawDbResults != null) {
+                for (shared.entities.Question dbQ : rawDbResults) {
+                    formattedGuiResults.add(mapDbQuestionToGuiQuestion(dbQ, dbQ.getCourseId()));
+                }
+            }
+            return Response.success(
+                    Command.GET_ALL_QUESTIONS,
+                    formattedGuiResults,
+                    null,
+                    request.getRequestId()
+            );
+        });
+
         router.registerHandler(Command.CREATE_QUESTION, request -> {
             CreateQuestionData wrapperDto = (CreateQuestionData) request.getPayload();
 
@@ -364,12 +425,21 @@ public class MainServerApp {
             String topic = wrapperDto.getTopic();
             String courseId = wrapperDto.getCourseId() != null ? wrapperDto.getCourseId() : DEFAULT_COURSE_ID;
 
-            // R04: teacher can only create questions for courses she teaches
-            if (wrapperDto.getTeacherId() != null
-                    && !examServerController.isTeacherAssignedToCourse(wrapperDto.getTeacherId(), courseId)) {
+            // R04: teacher can only create questions for courses she teaches.
+            // teacherId is the authenticated teacher after RequestIdentityBinder.
+            if (!examServerController.isTeacherAssignedToCourse(wrapperDto.getTeacherId(), courseId)) {
                 return Response.failure(
                         Command.CREATE_QUESTION,
                         "You don't teach this course, so you can't add questions to it.",
+                        request.getRequestId()
+                );
+            }
+
+            String validationError = QuestionCreateValidator.validate(wrapperDto);
+            if (validationError != null) {
+                return Response.failure(
+                        Command.CREATE_QUESTION,
+                        validationError,
                         request.getRequestId()
                 );
             }
@@ -385,7 +455,9 @@ public class MainServerApp {
                     topic,
                     courseId,
                     answersList,
-                    correctFlagsList
+                    correctFlagsList,
+                    wrapperDto.getImageData(),
+                    wrapperDto.getImagePath()
             );
 
             if (newQuestionId == null) {
@@ -404,6 +476,10 @@ public class MainServerApp {
             savedQ.setCourseId(courseId);
             savedQ.setDifficulty(wrapperDto.getDifficulty());
             savedQ.setAnswers(wrapperDto.getAnswers());
+            savedQ.setRootQuestionId(newQuestionId);
+            savedQ.setVersionNumber(1);
+            savedQ.setLatest(true);
+            QuestionIllustration.apply(savedQ, wrapperDto.getImageData(), wrapperDto.getImagePath());
 
             server.sendToAllClients(
                     Response.success(Command.QUESTIONS_CHANGED, null, "A question was created.", null)
@@ -421,39 +497,64 @@ public class MainServerApp {
             EditQuestionData wrapperDto = (EditQuestionData) request.getPayload();
 
             String questionId = wrapperDto.getQuestionId();
+            String actualCourseId = questionServerController.findCourseId(questionId);
+            if (actualCourseId == null
+                    || !examServerController.isTeacherAssignedToCourse(wrapperDto.getTeacherId(), actualCourseId)) {
+                return Response.failure(
+                        Command.EDIT_QUESTION,
+                        RequestAuthorizer.NOT_AUTHORIZED,
+                        request.getRequestId()
+                );
+            }
+
             String newText = wrapperDto.getText();
             String newInstruction = wrapperDto.getInstructions() != null ? wrapperDto.getInstructions() : "";
+
+            String validationError = QuestionCreateValidator.validate(wrapperDto);
+            if (validationError != null) {
+                return Response.failure(
+                        Command.EDIT_QUESTION,
+                        validationError,
+                        request.getRequestId()
+                );
+            }
 
             List<String> updatedAnswers = new ArrayList<>();
             List<Integer> correctnessBits = new ArrayList<>();
             extractAnswers(wrapperDto.getAnswers(), updatedAnswers, correctnessBits);
 
-            boolean isUpdated = questionServerController.editQuestion(
+            QuestionServerController.VersionEditResult editResult = questionServerController.createNextVersion(
                     questionId,
                     newText,
                     newInstruction,
+                    wrapperDto.getDifficulty() != null ? wrapperDto.getDifficulty().toString() : null,
+                    wrapperDto.getTopic(),
                     updatedAnswers,
-                    correctnessBits
+                    correctnessBits,
+                    wrapperDto.getImageData(),
+                    wrapperDto.getImagePath()
             );
 
-            if (!isUpdated) {
+            if (!editResult.success) {
                 return Response.failure(
                         Command.EDIT_QUESTION,
-                        "Database update rejected the change.",
+                        editResult.errorMessage != null ? editResult.errorMessage : "Database update rejected the change.",
                         request.getRequestId()
                 );
             }
 
             Question updatedQ = new Question();
-            updatedQ.setQuestionId(questionId);
+            updatedQ.setQuestionId(editResult.newQuestionId);
             updatedQ.setText(newText);
             updatedQ.setInstructions(newInstruction);
             updatedQ.setTopic(wrapperDto.getTopic());
-            updatedQ.setCourseId(questionId != null && questionId.length() >= 2
-                    ? questionId.substring(0, 2)
-                    : null);
+            updatedQ.setCourseId(actualCourseId);
             updatedQ.setDifficulty(wrapperDto.getDifficulty());
             updatedQ.setAnswers(wrapperDto.getAnswers());
+            updatedQ.setRootQuestionId(editResult.rootQuestionId);
+            updatedQ.setVersionNumber(editResult.newVersionNumber);
+            updatedQ.setLatest(true);
+            QuestionIllustration.apply(updatedQ, editResult.imageData, editResult.imageFilename);
 
             server.sendToAllClients(
                     Response.success(Command.QUESTIONS_CHANGED, null, "A question was edited.", null)
@@ -462,7 +563,8 @@ public class MainServerApp {
             return Response.success(
                     Command.EDIT_QUESTION,
                     updatedQ,
-                    "Question updated in MySQL successfully!",
+                    "Question updated. Version " + editResult.newVersionNumber
+                            + " created; previous version was preserved.",
                     request.getRequestId()
             );
         });
@@ -470,12 +572,22 @@ public class MainServerApp {
         router.registerHandler(Command.DELETE_QUESTION, request -> {
             DeleteQuestionData wrapperDto = (DeleteQuestionData) request.getPayload();
 
-            boolean isDeleted = questionServerController.deleteQuestion(wrapperDto.getQuestionId());
-
-            if (!isDeleted) {
+            String actualCourseId = questionServerController.findCourseId(wrapperDto.getQuestionId());
+            if (actualCourseId == null
+                    || !examServerController.isTeacherAssignedToCourse(wrapperDto.getTeacherId(), actualCourseId)) {
                 return Response.failure(
                         Command.DELETE_QUESTION,
-                        "Deletion command rejected by backend transaction.",
+                        RequestAuthorizer.NOT_AUTHORIZED,
+                        request.getRequestId()
+                );
+            }
+
+            String deleteError = questionServerController.deleteQuestion(wrapperDto.getQuestionId());
+
+            if (deleteError != null) {
+                return Response.failure(
+                        Command.DELETE_QUESTION,
+                        deleteError,
                         request.getRequestId()
                 );
             }
@@ -500,8 +612,13 @@ public class MainServerApp {
         guiQ.setText(dbQ.getText());
         guiQ.setTopic(dbQ.getTopic());
         guiQ.setDifficulty(parseDifficulty(dbQ.getDifficulty()));
-        guiQ.setCourseId(courseFilter);
+        guiQ.setCourseId(dbQ.getCourseId() != null && !dbQ.getCourseId().isBlank()
+                ? dbQ.getCourseId() : courseFilter);
         guiQ.setInstructions(dbQ.getInstructions());
+        guiQ.setRootQuestionId(dbQ.getRootQuestionId());
+        guiQ.setVersionNumber(dbQ.getVersionNumber());
+        guiQ.setLatest(dbQ.isLatest());
+        QuestionIllustration.apply(guiQ, dbQ.getImageData(), dbQ.getImageFilename());
 
         List<QuestionAnswer> guiAnswers = new ArrayList<>();
         if (dbQ.getAnswers() != null) {
@@ -553,18 +670,18 @@ public class MainServerApp {
                                            EventBus eventBus) {
         router.registerHandler(Command.CREATE_EXAM_MANUAL, request -> {
             CreateExamManualData data = (CreateExamManualData) request.getPayload();
-            Exam exam = examServerController.createManualExam(data);
+            ExamServerController.CreateExamResult result = examServerController.tryCreateManualExam(data);
 
-            if (exam == null) {
+            if (result.exam == null) {
                 return Response.failure(
                         Command.CREATE_EXAM_MANUAL,
-                        "Failed to create manual exam.",
+                        result.errorMessage != null ? result.errorMessage : "Failed to create manual exam.",
                         request.getRequestId()
                 );
             }
             return Response.success(
                     Command.CREATE_EXAM_MANUAL,
-                    exam,
+                    result.exam,
                     "Draft exam created successfully.",
                     request.getRequestId()
             );
@@ -572,19 +689,38 @@ public class MainServerApp {
 
         router.registerHandler(Command.CREATE_EXAM_AUTO, request -> {
             CreateExamAutoData data = (CreateExamAutoData) request.getPayload();
-            Exam exam = examServerController.createAutoExam(data);
+            ExamServerController.CreateExamResult result = examServerController.tryCreateAutoExam(data);
 
-            if (exam == null) {
+            if (result.exam == null) {
                 return Response.failure(
                         Command.CREATE_EXAM_AUTO,
-                        "Insufficient matching questions for criteria.",
+                        result.errorMessage != null ? result.errorMessage : "Insufficient matching questions for criteria.",
                         request.getRequestId()
                 );
             }
             return Response.success(
                     Command.CREATE_EXAM_AUTO,
-                    exam,
+                    result.exam,
                     "Auto-generated exam created successfully.",
+                    request.getRequestId()
+            );
+        });
+
+        router.registerHandler(Command.CREATE_EXAM_VERSION, request -> {
+            CreateExamVersionData data = (CreateExamVersionData) request.getPayload();
+            ExamServerController.CreateExamResult result = examServerController.tryCreateExamVersion(data);
+
+            if (result.exam == null) {
+                return Response.failure(
+                        Command.CREATE_EXAM_VERSION,
+                        result.errorMessage != null ? result.errorMessage : "Failed to create exam version.",
+                        request.getRequestId()
+                );
+            }
+            return Response.success(
+                    Command.CREATE_EXAM_VERSION,
+                    result.exam,
+                    "New exam version created as draft. Coordinator approval is required before execution.",
                     request.getRequestId()
             );
         });
@@ -660,11 +796,19 @@ public class MainServerApp {
                         request.getRequestId()
                 );
             }
+            ExamAnswer confirmed = examServerController.findExamAnswerById(data.getExamAnswerId()).orElse(null);
+            if (confirmed == null) {
+                return Response.failure(
+                        Command.CONFIRM_GRADE,
+                        "Grade was saved but could not be reloaded.",
+                        request.getRequestId()
+                );
+            }
             eventBus.publish(new ExamEvent(EventType.EXAM_GRADED, data.getExamAnswerId(),
                     null, null, "A grade was confirmed."));
             return Response.success(
                     Command.CONFIRM_GRADE,
-                    true,
+                    confirmed,
                     "Grade confirmed successfully.",
                     request.getRequestId()
             );
@@ -689,10 +833,11 @@ public class MainServerApp {
 
         router.registerHandler(Command.SUBMIT_EXAM_FOR_APPROVAL, request -> {
             SubmitExamForApprovalData data = (SubmitExamForApprovalData) request.getPayload();
-            Exam exam = examServerController.submitForApproval(data.getExamId());
+            Exam exam = examServerController.submitForApproval(data.getExamId(), data.getTeacherId());
             if (exam == null) {
                 return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
-                        "Only a draft or rejected exam can be submitted for approval.", request.getRequestId());
+                        "Could not submit this exam for approval. It must be your draft or rejected exam, and question points must total exactly 100.",
+                        request.getRequestId());
             }
             eventBus.publish(new ExamEvent(EventType.EXAM_SUBMITTED_FOR_APPROVAL, exam.getExamId(),
                     exam.getCourseId(), null, "A new exam is waiting for approval: " + exam.getTitle()));
@@ -743,6 +888,16 @@ public class MainServerApp {
             return Response.success(Command.GET_PENDING_GRADING, pending, null, request.getRequestId());
         });
 
+        router.registerHandler(Command.GET_EXAM_RESULTS, request -> {
+            GetExamResultsData data = (GetExamResultsData) request.getPayload();
+            List<ExamAnswer> results = examServerController.getExamResults(data.getExamId(), data.getTeacherId());
+            if (results == null) {
+                return Response.failure(Command.GET_EXAM_RESULTS,
+                        ExamResultsAccess.DENIED, request.getRequestId());
+            }
+            return Response.success(Command.GET_EXAM_RESULTS, results, null, request.getRequestId());
+        });
+
         router.registerHandler(Command.GET_MY_RESULTS, request -> {
             GetMyResultsData data = (GetMyResultsData) request.getPayload();
             List<ExamAnswer> mine = examServerController.getMyResults(data.getStudentId());
@@ -761,7 +916,8 @@ public class MainServerApp {
         router.registerHandler(Command.EXTEND_EXAM_TIME, request -> {
             ExtendExamTimeData data = (ExtendExamTimeData) request.getPayload();
             com.hsts.shared.model.ExamExecution execution =
-                    examServerController.extendExecutionTime(data.getExecutionId(), data.getAdditionalMinutes());
+                    examServerController.extendExecutionTime(
+                            data.getExecutionId(), data.getTeacherId(), data.getAdditionalMinutes());
             if (execution == null) {
                 return Response.failure(Command.EXTEND_EXAM_TIME,
                         "Could not extend time - execution not found.", request.getRequestId());
@@ -802,17 +958,35 @@ public class MainServerApp {
             return Response.success(Command.GET_EXAM_STATS, stats.get(), null, request.getRequestId());
         });
 
+        router.registerHandler(Command.GET_PRINCIPAL_COMPARISON_REPORT, request -> {
+            PrincipalComparisonReportData data = (PrincipalComparisonReportData) request.getPayload();
+            if (data == null || data.getReportType() == null) {
+                return Response.failure(Command.GET_PRINCIPAL_COMPARISON_REPORT,
+                        "Report type is required.", request.getRequestId());
+            }
+            if (data.getFilterValue() == null || data.getFilterValue().isBlank()) {
+                return Response.failure(Command.GET_PRINCIPAL_COMPARISON_REPORT,
+                        "Select a teacher, course, or student.", request.getRequestId());
+            }
+            PrincipalComparisonReport report = examServerController.getPrincipalComparisonReport(
+                    data.getReportType(), data.getFilterValue());
+            return Response.success(Command.GET_PRINCIPAL_COMPARISON_REPORT, report, null, request.getRequestId());
+        });
+
         // SUC 2.2: a teacher opens another execution (sitting) of an already-approved exam
         router.registerHandler(Command.CREATE_EXAM_EXECUTION, request -> {
             com.hsts.shared.net.dto.CreateExamExecutionData data =
                     (com.hsts.shared.net.dto.CreateExamExecutionData) request.getPayload();
-            com.hsts.shared.model.ExamExecution execution = examServerController.createExecution(
-                    data.getExamId(), data.getTeacherId(), data.getScheduledStart(), data.getScheduledEnd());
-            if (execution == null) {
+            ExamServerController.CreateExecutionResult result = examServerController.tryCreateExecution(
+                    data.getExamId(), data.getTeacherId(), data.getScheduledStart(), data.getScheduledEnd(),
+                    data.getExecutionCode());
+            if (result.execution == null) {
                 return Response.failure(Command.CREATE_EXAM_EXECUTION,
-                        "Could not open a new execution - either the exam isn't approved, or this is the exam's "
-                                + "first execution and open/close dates are required.", request.getRequestId());
+                        result.errorMessage != null ? result.errorMessage
+                                : "Could not open a new execution.",
+                        request.getRequestId());
             }
+            com.hsts.shared.model.ExamExecution execution = result.execution;
             eventBus.publish(new ExamEvent(EventType.EXECUTION_CREATED, execution.getExamId(),
                     null, null, "A new execution was opened - code: " + execution.getExecutionCode()));
             return Response.success(Command.CREATE_EXAM_EXECUTION, execution,
@@ -852,6 +1026,15 @@ public class MainServerApp {
                     if (!examServerController.isStudentEnrolled(data.getStudentId(), data.getCourseId())) {
                         return Response.failure(Command.ASK_BOT_QUESTION,
                                 "You're not registered for that course, so the study bot isn't available to you for it.",
+                                request.getRequestId());
+                    }
+
+                    // Course-aware exam lock: refuse BEFORE the external LLM call.
+                    if (examServerController.hasActiveExamInCourse(data.getStudentId(), data.getCourseId())) {
+                        System.out.println("[EXAM-LOCK] blocked ASK_BOT for " + data.getStudentId()
+                                + " course=" + data.getCourseId());
+                        return Response.failure(Command.ASK_BOT_QUESTION,
+                                ActiveExamTracker.BOT_UNAVAILABLE_MESSAGE,
                                 request.getRequestId());
                     }
 
@@ -957,7 +1140,8 @@ public class MainServerApp {
     private static void configureSessionHandling(HSTSServer server,
                                                  ServerRequestRouter router,
                                                  LoginServerController loginServerController,
-                                                 ConnectionRegistry connectionRegistry) {
+                                                 ConnectionRegistry connectionRegistry,
+                                                 ExamServerController examServerController) {
         server.setUserDisconnectHandler(sessionKey -> {
             if (isBlank(sessionKey)) {
                 return;
@@ -971,6 +1155,8 @@ public class MainServerApp {
                         + ": "
                         + exception.getMessage());
             }
+            // Active exam sittings are NOT cleared here. Disconnect must not
+            // unlock Study Bot for a student who started and never submitted.
         });
 
         server.setRouter(router);
@@ -988,10 +1174,53 @@ public class MainServerApp {
                                 + ": "
                                 + exception.getMessage());
                     }
+                    // Active exam sittings are NOT cleared here. Logout must not
+                    // unlock Study Bot for a student who started and never submitted.
                 }
 
                 unregisterLogoutSession(client, sessionKey, connectionRegistry);
                 return Response.success(Command.LOGOUT, null, "Logged out successfully.", request.getRequestId());
+            }
+
+            AuthenticatedSession session = connectionRegistry != null
+                    ? connectionRegistry.getSession(client) : null;
+            if (request.getCommand() != Command.LOGIN) {
+                String authError = RequestAuthorizer.authorize(request.getCommand(), session);
+                if (authError != null) {
+                    return Response.failure(request.getCommand(), authError, request.getRequestId());
+                }
+                RequestIdentityBinder.bindActor(request, session);
+
+                if (ExamResultsAccess.requiresExamAccessCheck(request.getCommand())) {
+                    Exam exam;
+                    if (ExamResultsAccess.requiresExecutionLookup(request.getCommand())) {
+                        String executionId = ExamResultsAccess.executionIdFromPayload(request.getPayload());
+                        var execution = examServerController.findExecutionById(executionId).orElse(null);
+                        exam = execution != null
+                                ? examServerController.getExamDetail(execution.getExamId()).orElse(null)
+                                : null;
+                    } else {
+                        String examId = ExamResultsAccess.examIdFromPayload(request.getPayload());
+                        exam = examId != null ? examServerController.getExamDetail(examId).orElse(null) : null;
+                    }
+                    String examAccessError = ExamResultsAccess.denyExamAccess(
+                            request.getCommand(), exam, session);
+                    if (examAccessError != null) {
+                        return Response.failure(request.getCommand(), examAccessError, request.getRequestId());
+                    }
+                }
+            }
+
+            // Course-aware exam lock uses authenticated student, not a forged DTO id.
+            if (request.getCommand() == Command.ASK_BOT_QUESTION
+                    && request.getPayload() instanceof com.hsts.shared.net.dto.AskBotQuestionData botData
+                    && session != null
+                    && examServerController.hasActiveExamInCourse(session.getUserId(), botData.getCourseId())) {
+                System.out.println("[EXAM-LOCK] blocked ASK_BOT for authenticated "
+                        + session.getUserId() + " course=" + botData.getCourseId());
+                return Response.failure(Command.ASK_BOT_QUESTION,
+                        ActiveExamTracker.BOT_UNAVAILABLE_MESSAGE,
+                        request.getRequestId());
             }
 
             Response response = router.route(request);
@@ -1014,8 +1243,11 @@ public class MainServerApp {
 
         String userId = user.getId();
         if (!isBlank(userId)) {
-            connectionRegistry.register(userId, client);
+            connectionRegistry.register(userId, user.getRole(), client);
             client.setInfo("userId", userId);
+            if (!isBlank(user.getRole())) {
+                client.setInfo("role", user.getRole());
+            }
         }
 
         Object payload = request.getPayload();

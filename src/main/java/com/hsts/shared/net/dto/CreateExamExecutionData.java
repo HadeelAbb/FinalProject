@@ -6,18 +6,26 @@ import java.io.Serializable;
 public class CreateExamExecutionData implements Serializable {
     private String examId;
     private String teacherId;
-    /** Format: yyyy-MM-dd HH:mm. Optional - blank uses the default window. */
+    /** Format: dd-MM-yyyy HH:mm. */
     private String scheduledStart;
     private String scheduledEnd;
+    /** Teacher-specified 4-character execution code (A-Z, 0-9). */
+    private String executionCode;
 
     public CreateExamExecutionData() {
     }
 
     public CreateExamExecutionData(String examId, String teacherId, String scheduledStart, String scheduledEnd) {
+        this(examId, teacherId, scheduledStart, scheduledEnd, null);
+    }
+
+    public CreateExamExecutionData(String examId, String teacherId, String scheduledStart, String scheduledEnd,
+                                   String executionCode) {
         this.examId = examId;
         this.teacherId = teacherId;
         this.scheduledStart = scheduledStart;
         this.scheduledEnd = scheduledEnd;
+        this.executionCode = executionCode;
     }
 
     public String getExamId() {
@@ -50,5 +58,13 @@ public class CreateExamExecutionData implements Serializable {
 
     public void setScheduledEnd(String scheduledEnd) {
         this.scheduledEnd = scheduledEnd;
+    }
+
+    public String getExecutionCode() {
+        return executionCode;
+    }
+
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 }

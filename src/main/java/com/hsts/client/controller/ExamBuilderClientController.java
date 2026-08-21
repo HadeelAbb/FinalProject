@@ -11,6 +11,8 @@ import com.hsts.shared.net.Command;
 import com.hsts.shared.net.Response;
 import com.hsts.shared.net.dto.CreateExamAutoData;
 import com.hsts.shared.net.dto.CreateExamManualData;
+import com.hsts.shared.net.dto.CreateExamVersionData;
+import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.SearchQuestionsData;
 import com.hsts.shared.net.dto.SubmitExamForApprovalData;
 
@@ -27,13 +29,17 @@ public class ExamBuilderClientController implements ResponseHandler {
         this.client = client;
         client.registerHandler(Command.CREATE_EXAM_MANUAL, this);
         client.registerHandler(Command.CREATE_EXAM_AUTO, this);
+        client.registerHandler(Command.CREATE_EXAM_VERSION, this);
+        client.registerHandler(Command.GET_MY_EXAMS, this);
         client.registerHandler(Command.SUBMIT_EXAM_FOR_APPROVAL, this);
         client.registerHandler(Command.SEARCH_QUESTIONS, this);
         client.registerHandler(Command.EXAM_EVENT, this);
     }
 
     public void searchQuestionsForCourse(String courseId) {
-        client.sendToServer(Command.SEARCH_QUESTIONS, new SearchQuestionsData(courseId, null, null));
+        SearchQuestionsData data = new SearchQuestionsData(courseId, null, null);
+        data.setLatestOnly(true);
+        client.sendToServer(Command.SEARCH_QUESTIONS, data);
     }
 
     public void setView(ExamBuilderWindow view) {
@@ -44,11 +50,26 @@ public class ExamBuilderClientController implements ResponseHandler {
         this.currentTeacher = teacher;
     }
 
+    public void refreshMyExams() {
+        String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
+        client.sendToServer(Command.GET_MY_EXAMS, new GetMyExamsData(teacherId));
+    }
+
     public void createManual(String courseId, String title, String instructions, String teacherNotes,
-                             List<String> questionIds, int durationMinutes) {
+                             List<String> questionIds, java.util.Map<String, Integer> questionPoints, int durationMinutes) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
         client.sendToServer(Command.CREATE_EXAM_MANUAL,
-                new CreateExamManualData(teacherId, courseId, title, instructions, teacherNotes, questionIds, durationMinutes));
+                new CreateExamManualData(teacherId, courseId, title, instructions, teacherNotes,
+                        questionIds, questionPoints, durationMinutes));
+    }
+
+    public void createVersion(String sourceExamId, String title, String instructions, String teacherNotes,
+                              List<String> questionIds, java.util.Map<String, Integer> questionPoints,
+                              int durationMinutes) {
+        String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
+        client.sendToServer(Command.CREATE_EXAM_VERSION,
+                new CreateExamVersionData(sourceExamId, teacherId, title, instructions, teacherNotes,
+                        questionIds, questionPoints, durationMinutes));
     }
 
     public void createAuto(String courseId, String title, String instructions, String teacherNotes, String topic,
@@ -56,6 +77,14 @@ public class ExamBuilderClientController implements ResponseHandler {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
         client.sendToServer(Command.CREATE_EXAM_AUTO, new CreateExamAutoData(teacherId, courseId, title,
                 instructions, teacherNotes, topic, difficulty, numberOfQuestions, durationMinutes));
+    }
+
+    /**
+     * The exam currently loaded in the builder. Selecting a persisted current
+     * DRAFT must set this so Review / Submit use that same physical examId.
+     */
+    public void selectExistingExam(Exam exam) {
+        this.currentDraft = exam;
     }
 
     public void submitForApproval() {
@@ -92,9 +121,14 @@ public class ExamBuilderClientController implements ResponseHandler {
             return;
         }
         switch (response.getCommand()) {
-            case CREATE_EXAM_MANUAL, CREATE_EXAM_AUTO -> {
+            case CREATE_EXAM_MANUAL, CREATE_EXAM_AUTO, CREATE_EXAM_VERSION -> {
                 currentDraft = (Exam) response.getPayload();
                 view.onExamCreated(currentDraft);
+            }
+            case GET_MY_EXAMS -> {
+                @SuppressWarnings("unchecked")
+                List<Exam> exams = (List<Exam>) response.getPayload();
+                view.displayMyExams(exams);
             }
             case SUBMIT_EXAM_FOR_APPROVAL -> {
                 currentDraft = (Exam) response.getPayload();

@@ -16,6 +16,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
 
 import java.util.List;
 
@@ -116,9 +117,10 @@ public class GradingWindow {
             showError("Final score must be a number.");
             return;
         }
-        boolean overriding = !finalScore.equals(selected.getAutoScore());
+        boolean overriding = selected.getAutoScore() == null
+                || Double.compare(selected.getAutoScore(), finalScore) != 0;
         if (overriding && (commentField.getText() == null || commentField.getText().isBlank())) {
-            showError("Changing the score requires a comment explaining why.");
+            showError("A reason is required when changing the automatic grade.");
             return;
         }
         String message = overriding
@@ -171,13 +173,22 @@ public class GradingWindow {
             super.updateItem(row, empty);
             if (empty || row == null) {
                 setText(null);
+                setGraphic(null);
                 setStyle("");
                 return;
             }
             String studentText = row.studentAnswer() != null ? row.studentAnswer() : "(no answer)";
             String line = row.question().getText() + "\n  student answered: " + studentText
                     + (row.correct() ? "  \u2713 correct" : "  \u2717 incorrect - correct answer: " + row.correctAnswer());
-            setText(line);
+            Label label = new Label(line);
+            label.setWrapText(true);
+            VBox box = new VBox(4, label);
+            javafx.scene.image.ImageView illustration = QuestionIllustrationView.preview(row.question(), 320, 160);
+            if (illustration.getImage() != null) {
+                box.getChildren().add(illustration);
+            }
+            setText(null);
+            setGraphic(box);
             setStyle(row.correct() ? "-fx-text-fill: #1a7a1a;" : "-fx-text-fill: #b3261e;");
         }
     }

@@ -19,6 +19,12 @@ public class Exam implements Serializable {
     private String instructionsForTeacher;
     private List<Question> questions = new ArrayList<>();
     private int durationMinutes;
+    /**
+     * Populated only on START_EXAM: remaining personal exam seconds for this
+     * student's sitting, derived from original startedAt. Not the base duration
+     * and not ExamExecution.scheduled_start.
+     */
+    private Integer remainingSeconds;
     private ExamStatus status = ExamStatus.DRAFT;
     private String createdByTeacherId;
     private String approvedByCoordinatorId;
@@ -26,6 +32,13 @@ public class Exam implements Serializable {
     private LocalDateTime scheduledStart;
     private LocalDateTime scheduledEnd;
     private String executionCode;
+    /**
+     * Physical exam_id of version 1 in this lineage. Each version is its own
+     * exams row; this only groups versions of the same logical exam.
+     */
+    private String rootExamId;
+    private int versionNumber = 1;
+    private boolean latest = true;
 
     public Exam() {
     }
@@ -39,6 +52,9 @@ public class Exam implements Serializable {
         this.questions = questions != null ? questions : new ArrayList<>();
         this.durationMinutes = durationMinutes;
         this.createdByTeacherId = createdByTeacherId;
+        this.rootExamId = examId;
+        this.versionNumber = 1;
+        this.latest = true;
     }
     // Overloaded constructor supporting executionCode
     public Exam(String examId, String courseId, String title, String instructionsForStudents,
@@ -112,6 +128,14 @@ public class Exam implements Serializable {
         this.durationMinutes = durationMinutes;
     }
 
+    public Integer getRemainingSeconds() {
+        return remainingSeconds;
+    }
+
+    public void setRemainingSeconds(Integer remainingSeconds) {
+        this.remainingSeconds = remainingSeconds;
+    }
+
     public ExamStatus getStatus() {
         return status;
     }
@@ -168,9 +192,38 @@ public class Exam implements Serializable {
         this.executionCode = executionCode;
     }
 
+    public String getRootExamId() {
+        return rootExamId != null && !rootExamId.isBlank() ? rootExamId : examId;
+    }
+
+    public void setRootExamId(String rootExamId) {
+        this.rootExamId = rootExamId;
+    }
+
+    public int getVersionNumber() {
+        return versionNumber <= 0 ? 1 : versionNumber;
+    }
+
+    public void setVersionNumber(int versionNumber) {
+        this.versionNumber = versionNumber;
+    }
+
+    public boolean isLatest() {
+        return latest;
+    }
+
+    public void setLatest(boolean latest) {
+        this.latest = latest;
+    }
+
+    public String versionStatusLabel() {
+        return latest ? "Current" : "Historical";
+    }
+
     @Override
     public String toString() {
-        return "[" + examId + "] " + title + " (" + status + ")";
+        return "[" + examId + "] v" + getVersionNumber() + " " + versionStatusLabel()
+                + " " + title + " (" + status + ")";
     }
 
     @Override

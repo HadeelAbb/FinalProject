@@ -16,9 +16,24 @@ public class Question implements Serializable {
     private String instructions;
     private Difficulty difficulty;
     private String topic;
+    /** Original filename only (never a teacher-local filesystem path). */
     private String imagePath;
+    /** PNG/JPG bytes persisted in MySQL and carried over OCSF. Not a JavaFX Image. */
+    private byte[] imageData;
     private String courseId;
+    /**
+     * Physical question_id of version 1 in this lineage. Exam rows keep their
+     * own physical question_id; this only groups versions in the bank.
+     */
+    private String rootQuestionId;
+    private int versionNumber = 1;
+    private boolean latest = true;
     private List<QuestionAnswer> answers = new ArrayList<>();
+    /**
+     * Points for this question inside a specific exam (exam_questions.points).
+     * Not a global property of the question bank.
+     */
+    private int points;
 
     public Question() {
     }
@@ -30,8 +45,11 @@ public class Question implements Serializable {
         this.instructions = instructions;
         this.difficulty = difficulty;
         this.topic = topic;
-        this.imagePath = imagePath;
+        setImagePath(imagePath);
         this.courseId = courseId;
+        this.rootQuestionId = questionId;
+        this.versionNumber = 1;
+        this.latest = true;
         this.answers = answers != null ? answers : new ArrayList<>();
     }
 
@@ -80,7 +98,19 @@ public class Question implements Serializable {
     }
 
     public void setImagePath(String imagePath) {
-        this.imagePath = imagePath;
+        this.imagePath = QuestionIllustration.sanitizeFilename(imagePath);
+    }
+
+    public byte[] getImageData() {
+        return imageData;
+    }
+
+    public void setImageData(byte[] imageData) {
+        this.imageData = QuestionIllustration.copy(imageData);
+    }
+
+    public boolean hasIllustration() {
+        return QuestionIllustration.hasData(imageData);
     }
 
     public String getCourseId() {
@@ -91,6 +121,34 @@ public class Question implements Serializable {
         this.courseId = courseId;
     }
 
+    public String getRootQuestionId() {
+        return rootQuestionId != null && !rootQuestionId.isBlank() ? rootQuestionId : questionId;
+    }
+
+    public void setRootQuestionId(String rootQuestionId) {
+        this.rootQuestionId = rootQuestionId;
+    }
+
+    public int getVersionNumber() {
+        return versionNumber <= 0 ? 1 : versionNumber;
+    }
+
+    public void setVersionNumber(int versionNumber) {
+        this.versionNumber = versionNumber;
+    }
+
+    public boolean isLatest() {
+        return latest;
+    }
+
+    public void setLatest(boolean latest) {
+        this.latest = latest;
+    }
+
+    public String versionStatusLabel() {
+        return latest ? "Current" : "Historical";
+    }
+
     public List<QuestionAnswer> getAnswers() {
         return answers;
     }
@@ -99,12 +157,21 @@ public class Question implements Serializable {
         this.answers = answers;
     }
 
+    public int getPoints() {
+        return points;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
+    }
+
     public QuestionAnswer getCorrectAnswer() {
         return answers.stream().filter(QuestionAnswer::isCorrect).findFirst().orElse(null);
     }
 
     @Override
     public String toString() {
-        return "[" + questionId + "] (" + topic + " / " + difficulty + ") " + text;
+        return "[" + questionId + "] v" + getVersionNumber() + " " + versionStatusLabel()
+                + " (" + topic + " / " + difficulty + ") " + text;
     }
 }

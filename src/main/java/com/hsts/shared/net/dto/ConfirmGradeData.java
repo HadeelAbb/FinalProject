@@ -3,9 +3,10 @@ package com.hsts.shared.net.dto;
 import java.io.Serializable;
 
 /**
- * SUC-8: teacher confirms the auto-computed grade as-is, or overrides it -
- * either way requires a comment explaining the decision (per R-requirement
- * that a manual score change must be justified).
+ * SUC-8: teacher confirms the auto-computed grade as-is, or overrides it.
+ * A non-blank teacherComment is required only when finalScore differs from
+ * the official stored autoScore. The client must not send autoScore; the
+ * server compares against ExamAnswer.autoScore from storage.
  */
 public class ConfirmGradeData implements Serializable {
     private String examAnswerId;

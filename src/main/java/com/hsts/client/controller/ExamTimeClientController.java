@@ -51,10 +51,10 @@ public class ExamTimeClientController implements ResponseHandler {
                 new ExtendExamTimeData(examId, executionId, currentTeacher.getId(), additionalMinutes));
     }
 
-    /** SUC 2.2: opens a NEW sitting of an already-approved exam, with its own code and window. */
-    public void createExecution(String examId, String scheduledStart, String scheduledEnd) {
+    /** SUC 2.2: opens a NEW sitting of an already-approved exam, with teacher-chosen code and window. */
+    public void createExecution(String examId, String scheduledStart, String scheduledEnd, String executionCode) {
         client.sendToServer(Command.CREATE_EXAM_EXECUTION,
-                new CreateExamExecutionData(examId, currentTeacher.getId(), scheduledStart, scheduledEnd));
+                new CreateExamExecutionData(examId, currentTeacher.getId(), scheduledStart, scheduledEnd, executionCode));
     }
 
     public void loadExecutions(String examId) {

@@ -6,9 +6,11 @@ import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Difficulty;
 import com.hsts.shared.model.Exam;
 import com.hsts.shared.model.ExamAnswer;
+import com.hsts.shared.model.ExamExecution;
 import com.hsts.shared.model.ExamStatus;
 import com.hsts.shared.model.Question;
 import com.hsts.shared.model.QuestionAnswer;
+import com.hsts.shared.model.QuestionIllustration;
 import com.hsts.shared.model.Student;
 import com.hsts.shared.model.SubjectCoordinator;
 import com.hsts.shared.model.Teacher;
@@ -18,7 +20,9 @@ import com.hsts.shared.net.Response;
 import com.hsts.shared.net.dto.AskBotQuestionData;
 import com.hsts.shared.net.dto.ConfirmGradeData;
 import com.hsts.shared.net.dto.CreateExamAutoData;
+import com.hsts.shared.net.dto.CreateExamExecutionData;
 import com.hsts.shared.net.dto.CreateExamManualData;
+import com.hsts.shared.net.dto.CreateExamVersionData;
 import com.hsts.shared.net.dto.CreateQuestionData;
 import com.hsts.shared.net.dto.DeleteQuestionData;
 import com.hsts.shared.net.dto.EditQuestionData;
@@ -28,6 +32,7 @@ import com.hsts.shared.net.dto.GetAvailableExamsData;
 import com.hsts.shared.net.dto.GetBotHistoryData;
 import com.hsts.shared.net.dto.GetBotUsageStatsData;
 import com.hsts.shared.net.dto.GetExamDetailData;
+import com.hsts.shared.net.dto.GetExamExecutionsData;
 import com.hsts.shared.net.dto.GetExamAnswerCopyData;
 import com.hsts.shared.net.dto.GetMyExamsData;
 import com.hsts.shared.net.dto.GetMyResultsData;
@@ -69,10 +74,12 @@ public class MockServerSimulator {
     private final Map<String, User> usersById = new HashMap<>();
     private final List<Question> questionBank = new ArrayList<>();
     private final List<Exam> exams = new ArrayList<>();
+    private final List<ExamExecution> executions = new ArrayList<>();
     private final List<ExamAnswer> examAnswers = new ArrayList<>();
     private final List<BotInteraction> botInteractions = new ArrayList<>();
     private int examSeq = 0;
     private int examAnswerSeq = 0;
+    private int executionSeq = 0;
     private int botInteractionSeq = 0;
 
     private final Course course11 = new Course("11", "Introduction to Computer Science");
@@ -175,6 +182,7 @@ public class MockServerSimulator {
 
             case CREATE_EXAM_MANUAL -> handleCreateExamManual((CreateExamManualData) payload);
             case CREATE_EXAM_AUTO -> handleCreateExamAuto((CreateExamAutoData) payload);
+            case CREATE_EXAM_VERSION -> handleCreateExamVersion((CreateExamVersionData) payload);
             case GET_MY_EXAMS -> handleGetMyExams((GetMyExamsData) payload);
             case SUBMIT_EXAM_FOR_APPROVAL -> handleSubmitForApproval((SubmitExamForApprovalData) payload);
             case GET_PENDING_APPROVAL_EXAMS -> handleGetPendingApproval();
@@ -188,15 +196,25 @@ public class MockServerSimulator {
             case GET_PENDING_GRADING -> handleGetPendingGrading((GetPendingGradingData) payload);
             case CONFIRM_GRADE -> handleConfirmGrade((ConfirmGradeData) payload);
             case GET_EXAM_DETAIL -> handleGetExamDetail((GetExamDetailData) payload);
+            case GET_EXAM_RESULTS -> handleGetExamResults((com.hsts.shared.net.dto.GetExamResultsData) payload);
 
             case GET_MY_RESULTS -> handleGetMyResults((GetMyResultsData) payload);
             case GET_EXAM_ANSWER_COPY -> handleGetExamAnswerCopy((GetExamAnswerCopyData) payload);
 
             case EXTEND_EXAM_TIME -> handleExtendTime((ExtendExamTimeData) payload);
 
+            case GET_ALL_EXAMS -> Response.success(Command.GET_ALL_EXAMS, new ArrayList<>(exams), null, null);
+            case GET_ALL_RESULTS -> Response.success(Command.GET_ALL_RESULTS, confirmedAnswers(), null, null);
+            case GET_PRINCIPAL_COMPARISON_REPORT -> handlePrincipalComparison(
+                    (com.hsts.shared.net.dto.PrincipalComparisonReportData) payload);
+            case GET_ALL_QUESTIONS -> handleGetAllQuestions((SearchQuestionsData) payload);
+
             case ASK_BOT_QUESTION -> handleAskBot((AskBotQuestionData) payload);
             case GET_BOT_HISTORY -> handleGetBotHistory((GetBotHistoryData) payload);
             case GET_BOT_USAGE_STATS -> handleGetBotUsageStats((GetBotUsageStatsData) payload);
+
+            case CREATE_EXAM_EXECUTION -> handleCreateExamExecution((CreateExamExecutionData) payload);
+            case GET_EXAM_EXECUTIONS -> handleGetExamExecutions((GetExamExecutionsData) payload);
 
             default -> Response.failure(command, "Unsupported command", null);
         };
@@ -231,9 +249,24 @@ public class MockServerSimulator {
             if (criteria.getDifficulty() != null && q.getDifficulty() != criteria.getDifficulty()) {
                 continue;
             }
+            if (criteria.isLatestOnly() && !q.isLatest()) {
+                continue;
+            }
             results.add(q);
         }
         return Response.success(Command.SEARCH_QUESTIONS, results, null, null);
+    }
+
+    private Response handleGetAllQuestions(SearchQuestionsData criteria) {
+        SearchQuestionsData filters = criteria != null ? criteria : new SearchQuestionsData();
+        List<Question> results = new ArrayList<>();
+        for (Question q : questionBank) {
+            if (com.hsts.shared.model.PrincipalQuestionFilter.matches(
+                    q, filters.getCourseId(), filters.getTopic(), filters.getDifficulty())) {
+                results.add(q);
+            }
+        }
+        return Response.success(Command.GET_ALL_QUESTIONS, results, null, null);
     }
 
     private Response handleCreate(CreateQuestionData data) {
@@ -243,6 +276,10 @@ public class MockServerSimulator {
         long correctCount = data.getAnswers().stream().filter(QuestionAnswer::isCorrect).count();
         if (correctCount != 1) {
             return Response.failure(Command.CREATE_QUESTION, "Exactly one answer must be marked correct.", null);
+        }
+        String imageError = QuestionIllustration.validate(data.getImageData(), data.getImagePath());
+        if (imageError != null) {
+            return Response.failure(Command.CREATE_QUESTION, imageError, null);
         }
 
         Teacher teacher = findTeacherById(data.getTeacherId());
@@ -254,6 +291,7 @@ public class MockServerSimulator {
         String newId = generateQuestionId(data.getCourseId());
         Question question = new Question(newId, data.getText(), data.getInstructions(), data.getDifficulty(),
                 data.getTopic(), data.getImagePath(), data.getCourseId(), data.getAnswers());
+        QuestionIllustration.apply(question, data.getImageData(), data.getImagePath());
         questionBank.add(question);
         return Response.success(Command.CREATE_QUESTION, question, null, null);
     }
@@ -269,22 +307,42 @@ public class MockServerSimulator {
         if (existing == null) {
             return Response.failure(Command.EDIT_QUESTION, "Question " + data.getQuestionId() + " not found.", null);
         }
-        if (data.getAnswers() != null) {
-            if (data.getAnswers().size() != 4) {
-                return Response.failure(Command.EDIT_QUESTION, "A question must have exactly 4 answers.", null);
-            }
-            long correctCount = data.getAnswers().stream().filter(QuestionAnswer::isCorrect).count();
-            if (correctCount != 1) {
-                return Response.failure(Command.EDIT_QUESTION, "Exactly one answer must be marked correct.", null);
-            }
-            existing.setAnswers(data.getAnswers());
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null || !teacher.teaches(existing.getCourseId())) {
+            return Response.failure(Command.EDIT_QUESTION,
+                    server.controllers.RequestAuthorizer.NOT_AUTHORIZED, null);
         }
-        existing.setText(data.getText());
-        existing.setInstructions(data.getInstructions());
-        existing.setDifficulty(data.getDifficulty());
-        existing.setTopic(data.getTopic());
-        existing.setImagePath(data.getImagePath());
-        return Response.success(Command.EDIT_QUESTION, existing, null, null);
+        if (!existing.isLatest()) {
+            return Response.failure(Command.EDIT_QUESTION,
+                    server.controllers.QuestionVersioning.HISTORICAL_NOT_EDITABLE, null);
+        }
+        String validationError = server.controllers.QuestionCreateValidator.validate(data);
+        if (validationError != null) {
+            return Response.failure(Command.EDIT_QUESTION, validationError, null);
+        }
+
+        existing.setLatest(false);
+        String newId = generateQuestionId(existing.getCourseId());
+        Question next = new Question(newId, data.getText(), data.getInstructions(), data.getDifficulty(),
+                data.getTopic(), data.getImagePath(), existing.getCourseId(), copyAnswers(data.getAnswers()));
+        if (QuestionIllustration.hasData(data.getImageData())) {
+            QuestionIllustration.apply(next, data.getImageData(), data.getImagePath());
+        } else {
+            QuestionIllustration.copyOnto(existing, next);
+        }
+        next.setRootQuestionId(existing.getRootQuestionId());
+        int maxVersion = 1;
+        for (Question q : questionBank) {
+            if (existing.getRootQuestionId().equals(q.getRootQuestionId())) {
+                maxVersion = Math.max(maxVersion, q.getVersionNumber());
+            }
+        }
+        next.setVersionNumber(server.controllers.QuestionVersioning.nextVersionNumber(maxVersion));
+        next.setLatest(true);
+        questionBank.add(next);
+        return Response.success(Command.EDIT_QUESTION, next,
+                "Question updated. Version " + next.getVersionNumber()
+                        + " created; previous version was preserved.", null);
     }
 
     private Response handleDelete(DeleteQuestionData data) {
@@ -292,7 +350,28 @@ public class MockServerSimulator {
         if (existing == null) {
             return Response.failure(Command.DELETE_QUESTION, "Question " + data.getQuestionId() + " not found.", null);
         }
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null || !teacher.teaches(existing.getCourseId())) {
+            return Response.failure(Command.DELETE_QUESTION,
+                    server.controllers.RequestAuthorizer.NOT_AUTHORIZED, null);
+        }
+        if (server.controllers.QuestionVersioning.isReferencedByExam(data.getQuestionId(), exams)) {
+            return Response.failure(Command.DELETE_QUESTION,
+                    server.controllers.QuestionVersioning.USED_BY_EXAM, null);
+        }
         questionBank.remove(existing);
+        if (existing.isLatest()) {
+            Question promote = null;
+            for (Question q : questionBank) {
+                if (existing.getRootQuestionId().equals(q.getRootQuestionId())
+                        && (promote == null || q.getVersionNumber() > promote.getVersionNumber())) {
+                    promote = q;
+                }
+            }
+            if (promote != null) {
+                promote.setLatest(true);
+            }
+        }
         return Response.success(Command.DELETE_QUESTION, data.getQuestionId(), null, null);
     }
 
@@ -318,8 +397,15 @@ public class MockServerSimulator {
         if (chosen.size() != data.getQuestionIds().size()) {
             return Response.failure(Command.CREATE_EXAM_MANUAL, "One or more selected questions no longer exist.", null);
         }
+        String pointsError = server.controllers.ExamQuestionPointsValidator.validate(
+                data.getQuestionIds(), data.getQuestionPoints());
+        if (pointsError != null) {
+            return Response.failure(Command.CREATE_EXAM_MANUAL, pointsError, null);
+        }
+        List<Question> attached = attachQuestions(data.getQuestionIds(), data.getQuestionPoints());
         Exam exam = new Exam(nextExamId(), data.getCourseId(), data.getTitle(), data.getInstructionsForStudents(),
-                chosen, data.getDurationMinutes(), data.getTeacherId());
+                attached, data.getDurationMinutes(), data.getTeacherId());
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
         exams.add(exam);
         return Response.success(Command.CREATE_EXAM_MANUAL, exam, "Exam created as draft.", null);
     }
@@ -339,6 +425,7 @@ public class MockServerSimulator {
         }
         List<Question> matches = questionBank.stream()
                 .filter(q -> q.getCourseId().equals(data.getCourseId()))
+                .filter(Question::isLatest)
                 .filter(q -> data.getTopic() == null || data.getTopic().isBlank()
                         || q.getTopic().toLowerCase().contains(data.getTopic().toLowerCase()))
                 .filter(q -> data.getDifficulty() == null || q.getDifficulty() == data.getDifficulty())
@@ -349,10 +436,85 @@ public class MockServerSimulator {
                     "Not enough matching questions in the bank (found " + matches.size()
                             + ", requested " + data.getNumberOfQuestions() + ").", null);
         }
+        String splitError = server.controllers.ExamQuestionPointsValidator.validateEqualSplit(matches.size());
+        if (splitError != null) {
+            return Response.failure(Command.CREATE_EXAM_AUTO, splitError, null);
+        }
+        int pointsEach = server.controllers.ExamQuestionPointsValidator.equalSplitPoints(matches.size());
+        List<Question> attached = new ArrayList<>();
+        for (Question q : matches) {
+            attached.add(copyQuestionForExam(q, pointsEach));
+        }
         Exam exam = new Exam(nextExamId(), data.getCourseId(), data.getTitle(), data.getInstructionsForStudents(),
-                matches, data.getDurationMinutes(), data.getTeacherId());
+                attached, data.getDurationMinutes(), data.getTeacherId());
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
         exams.add(exam);
         return Response.success(Command.CREATE_EXAM_AUTO, exam, "Exam auto-built as draft.", null);
+    }
+
+    private Response handleCreateExamVersion(CreateExamVersionData data) {
+        if (data == null || data.getSourceExamId() == null || data.getSourceExamId().isBlank()) {
+            return Response.failure(Command.CREATE_EXAM_VERSION,
+                    server.controllers.ExamVersioning.SOURCE_NOT_FOUND, null);
+        }
+        String titleError = server.controllers.ExamVersioning.validateTitle(data.getTitle());
+        if (titleError != null) {
+            return Response.failure(Command.CREATE_EXAM_VERSION, titleError, null);
+        }
+        String durationError = server.controllers.ExamVersioning.validateDuration(data.getDurationMinutes());
+        if (durationError != null) {
+            return Response.failure(Command.CREATE_EXAM_VERSION, durationError, null);
+        }
+        Exam source = findExamById(data.getSourceExamId());
+        if (source == null) {
+            return Response.failure(Command.CREATE_EXAM_VERSION,
+                    server.controllers.ExamVersioning.SOURCE_NOT_FOUND, null);
+        }
+        if (data.getTeacherId() == null || !data.getTeacherId().equals(source.getCreatedByTeacherId())) {
+            return Response.failure(Command.CREATE_EXAM_VERSION,
+                    server.controllers.RequestAuthorizer.NOT_AUTHORIZED, null);
+        }
+        Teacher teacher = findTeacherById(data.getTeacherId());
+        if (teacher == null || !teacher.teaches(source.getCourseId())) {
+            return Response.failure(Command.CREATE_EXAM_VERSION,
+                    "You don't have permission to build exams for this course.", null);
+        }
+        if (!source.isLatest()) {
+            return Response.failure(Command.CREATE_EXAM_VERSION,
+                    server.controllers.ExamVersioning.HISTORICAL_NOT_EDITABLE, null);
+        }
+        String pointsError = server.controllers.ExamQuestionPointsValidator.validate(
+                data.getQuestionIds(), data.getQuestionPoints());
+        if (pointsError != null) {
+            return Response.failure(Command.CREATE_EXAM_VERSION, pointsError, null);
+        }
+        List<Question> selected = new ArrayList<>();
+        for (String id : data.getQuestionIds()) {
+            Question q = findById(id);
+            if (q == null) {
+                return Response.failure(Command.CREATE_EXAM_VERSION,
+                        "One or more selected questions no longer exist.", null);
+            }
+            selected.add(q);
+        }
+        String latestError = server.controllers.ExamVersioning.validateNewlyAddedQuestionsAreLatest(
+                server.controllers.ExamVersioning.physicalQuestionIds(source), selected);
+        if (latestError != null) {
+            return Response.failure(Command.CREATE_EXAM_VERSION, latestError, null);
+        }
+        List<Question> attached = attachQuestions(data.getQuestionIds(), data.getQuestionPoints());
+        String newId = nextExamId();
+        Exam exam = new Exam(newId, source.getCourseId(), data.getTitle(), data.getInstructionsForStudents(),
+                attached, data.getDurationMinutes(), source.getCreatedByTeacherId());
+        exam.setInstructionsForTeacher(data.getInstructionsForTeacher());
+        exam.setStatus(ExamStatus.DRAFT);
+        exam.setRootExamId(source.getRootExamId());
+        exam.setVersionNumber(server.controllers.ExamVersioning.nextVersionNumber(maxVersionForRoot(source.getRootExamId())));
+        exam.setLatest(true);
+        source.setLatest(false);
+        exams.add(exam);
+        return Response.success(Command.CREATE_EXAM_VERSION, exam,
+                "New exam version created as draft. Coordinator approval is required before execution.", null);
     }
 
     // ===================== SUC-4: approval =====================
@@ -361,6 +523,15 @@ public class MockServerSimulator {
         Exam exam = findExamById(data.getExamId());
         if (exam == null) {
             return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL, "Exam not found.", null);
+        }
+        if (data.getTeacherId() != null && exam.getCreatedByTeacherId() != null
+                && !data.getTeacherId().equals(exam.getCreatedByTeacherId())) {
+            return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
+                    server.controllers.RequestAuthorizer.NOT_AUTHORIZED, null);
+        }
+        if (!exam.isLatest()) {
+            return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
+                    server.controllers.ExamVersioning.HISTORICAL_NOT_SUBMITTABLE, null);
         }
         if (exam.getStatus() != ExamStatus.DRAFT && exam.getStatus() != ExamStatus.REJECTED) {
             return Response.failure(Command.SUBMIT_EXAM_FOR_APPROVAL,
@@ -470,16 +641,13 @@ public class MockServerSimulator {
         if (exam == null || exam.getQuestions().isEmpty()) {
             return 0.0;
         }
-        double points = exam.pointsPerQuestion();
-        double total = 0.0;
+        java.util.Map<String, String> officialCorrect = new java.util.HashMap<>();
         for (Question q : exam.getQuestions()) {
-            String selected = answer.getSelectedAnswers().get(q.getQuestionId());
             QuestionAnswer correct = q.getCorrectAnswer();
-            if (selected != null && correct != null && selected.equals(correct.getText())) {
-                total += points;
-            }
+            officialCorrect.put(q.getQuestionId(), correct != null ? correct.getText() : null);
         }
-        return Math.round(total * 100.0) / 100.0;
+        return server.controllers.ExamQuestionPointsValidator.grade(
+                exam.getQuestions(), answer.getSelectedAnswers(), officialCorrect);
     }
 
     // ===================== SUC-7 / SUC-8: grading & confirmation =====================
@@ -503,6 +671,18 @@ public class MockServerSimulator {
         return Response.success(Command.GET_PENDING_GRADING, pending, null, null);
     }
 
+    private Response handleGetExamResults(com.hsts.shared.net.dto.GetExamResultsData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (server.controllers.ExamResultsAccess.denyIfNotOwner(exam, data.getTeacherId()) != null) {
+            return Response.failure(Command.GET_EXAM_RESULTS,
+                    server.controllers.ExamResultsAccess.DENIED, null);
+        }
+        List<ExamAnswer> results = examAnswers.stream()
+                .filter(a -> data.getExamId().equals(a.getExamId()) && a.getSubmittedAt() != null)
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_EXAM_RESULTS, results, null, null);
+    }
+
     private Response handleConfirmGrade(ConfirmGradeData data) {
         ExamAnswer answer = examAnswers.stream()
                 .filter(a -> a.getExamAnswerId().equals(data.getExamAnswerId()))
@@ -510,11 +690,17 @@ public class MockServerSimulator {
         if (answer == null) {
             return Response.failure(Command.CONFIRM_GRADE, "Exam answer not found.", null);
         }
-        boolean overridden = data.getFinalScore() != null
-                && !data.getFinalScore().equals(answer.getAutoScore());
-        if (overridden && (data.getTeacherComment() == null || data.getTeacherComment().isBlank())) {
+        Exam exam = findExamById(answer.getExamId());
+        if (exam != null && exam.getCreatedByTeacherId() != null
+                && data.getTeacherId() != null
+                && !data.getTeacherId().equals(exam.getCreatedByTeacherId())) {
             return Response.failure(Command.CONFIRM_GRADE,
-                    "Changing the automatic score requires a comment explaining why.", null);
+                    server.controllers.RequestAuthorizer.NOT_AUTHORIZED, null);
+        }
+        String reasonError = server.controllers.GradeChangeReasonValidator.validate(
+                answer.getAutoScore(), data.getFinalScore(), data.getTeacherComment());
+        if (reasonError != null) {
+            return Response.failure(Command.CONFIRM_GRADE, reasonError, null);
         }
         answer.setFinalScore(data.getFinalScore() != null ? data.getFinalScore() : answer.getAutoScore());
         answer.setTeacherComment(data.getTeacherComment());
@@ -557,6 +743,26 @@ public class MockServerSimulator {
         exam.setDurationMinutes(exam.getDurationMinutes() + data.getAdditionalMinutes());
         return Response.success(Command.EXTEND_EXAM_TIME, exam,
                 "Time extended by " + data.getAdditionalMinutes() + " minutes.", null);
+    }
+
+    private List<ExamAnswer> confirmedAnswers() {
+        return examAnswers.stream()
+                .filter(a -> a.isGradeConfirmed() && a.getSubmittedAt() != null)
+                .collect(Collectors.toList());
+    }
+
+    private Response handlePrincipalComparison(com.hsts.shared.net.dto.PrincipalComparisonReportData data) {
+        if (data == null || data.getReportType() == null) {
+            return Response.failure(Command.GET_PRINCIPAL_COMPARISON_REPORT, "Report type is required.", null);
+        }
+        if (data.getFilterValue() == null || data.getFilterValue().isBlank()) {
+            return Response.failure(Command.GET_PRINCIPAL_COMPARISON_REPORT,
+                    "Select a teacher, course, or student.", null);
+        }
+        return Response.success(Command.GET_PRINCIPAL_COMPARISON_REPORT,
+                com.hsts.shared.model.PrincipalReportAssembler.assemble(
+                        data.getReportType(), data.getFilterValue(), exams, confirmedAnswers()),
+                null, null);
     }
 
     // ===================== SUC-13/14/15: study bot =====================
@@ -625,6 +831,89 @@ public class MockServerSimulator {
         return exams.stream().filter(e -> e.getExamId().equals(examId)).findFirst().orElse(null);
     }
 
+    private int maxVersionForRoot(String rootId) {
+        int max = 0;
+        for (Exam exam : exams) {
+            if (rootId != null && rootId.equals(exam.getRootExamId())) {
+                max = Math.max(max, exam.getVersionNumber());
+            }
+        }
+        return max;
+    }
+
+    private List<Question> attachQuestions(List<String> questionIds, Map<String, Integer> points) {
+        List<Question> attached = new ArrayList<>();
+        for (String id : questionIds) {
+            Question source = findById(id);
+            attached.add(copyQuestionForExam(source, points.get(id)));
+        }
+        return attached;
+    }
+
+    private Question copyQuestionForExam(Question source, int points) {
+        List<QuestionAnswer> answers = source.getAnswers() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(source.getAnswers());
+        Question copy = new Question(source.getQuestionId(), source.getText(), source.getInstructions(),
+                source.getDifficulty(), source.getTopic(), source.getImagePath(), source.getCourseId(), answers);
+        copy.setRootQuestionId(source.getRootQuestionId());
+        copy.setVersionNumber(source.getVersionNumber());
+        copy.setLatest(source.isLatest());
+        copy.setPoints(points);
+        QuestionIllustration.copyOnto(source, copy);
+        return copy;
+    }
+
+    private Response handleCreateExamExecution(CreateExamExecutionData data) {
+        Exam exam = findExamById(data.getExamId());
+        if (exam == null) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION, "Exam not found.", null);
+        }
+        if (data.getTeacherId() == null || !data.getTeacherId().equals(exam.getCreatedByTeacherId())) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION,
+                    server.controllers.ExamResultsAccess.ACCESS_DENIED, null);
+        }
+        String approvedError = server.controllers.ExamExecutionCreateValidator.validateApproved(exam.getStatus());
+        if (approvedError != null) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION, approvedError, null);
+        }
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+        LocalDateTime start;
+        LocalDateTime end;
+        try {
+            start = LocalDateTime.parse(data.getScheduledStart(), fmt);
+            end = LocalDateTime.parse(data.getScheduledEnd(), fmt);
+        } catch (Exception e) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION,
+                    "Opening and closing times must use the format dd-MM-yyyy HH:mm.", null);
+        }
+        String windowError = server.controllers.ExamExecutionCreateValidator.validateWindow(start, end);
+        if (windowError != null) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION, windowError, null);
+        }
+        String codeError = server.controllers.ExamExecutionCreateValidator.validateExecutionCode(data.getExecutionCode());
+        if (codeError != null) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION, codeError, null);
+        }
+        String code = server.controllers.ExamExecutionCreateValidator.normalizeExecutionCode(data.getExecutionCode());
+        boolean codeUsed = executions.stream().anyMatch(e -> code.equals(e.getExecutionCode()));
+        if (codeUsed) {
+            return Response.failure(Command.CREATE_EXAM_EXECUTION, "Execution code is already in use.", null);
+        }
+        executionSeq++;
+        ExamExecution execution = new ExamExecution(
+                "EX" + executionSeq, exam.getExamId(), code, start, end, data.getTeacherId());
+        executions.add(execution);
+        return Response.success(Command.CREATE_EXAM_EXECUTION, execution, "Execution created.", null);
+    }
+
+    private Response handleGetExamExecutions(GetExamExecutionsData data) {
+        List<ExamExecution> mine = executions.stream()
+                .filter(e -> data.getExamId().equals(e.getExamId()))
+                .collect(Collectors.toList());
+        return Response.success(Command.GET_EXAM_EXECUTIONS, mine, null, null);
+    }
+
     private String nextExamId() {
         examSeq++;
         return "E" + examSeq;
@@ -662,5 +951,16 @@ public class MockServerSimulator {
         }
         int nextSeq = maxSeq + 1;
         return String.format("%03d%s", nextSeq, courseId);
+    }
+
+    private static List<QuestionAnswer> copyAnswers(List<QuestionAnswer> answers) {
+        List<QuestionAnswer> copy = new ArrayList<>();
+        if (answers == null) {
+            return copy;
+        }
+        for (QuestionAnswer answer : answers) {
+            copy.add(new QuestionAnswer(answer.getText(), answer.isCorrect()));
+        }
+        return copy;
     }
 }

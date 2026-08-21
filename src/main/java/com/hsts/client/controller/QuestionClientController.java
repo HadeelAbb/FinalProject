@@ -48,10 +48,11 @@ public class QuestionClientController implements ResponseHandler {
     }
 
     public void createQuestion(String text, String instructions, Difficulty difficulty, String topic,
-                               String imagePath, String courseId, List<QuestionAnswer> answers) {
+                               String imagePath, byte[] imageData, String courseId, List<QuestionAnswer> answers) {
         String teacherId = currentTeacher != null ? currentTeacher.getId() : null;
         CreateQuestionData data = new CreateQuestionData(text, instructions, difficulty, topic, imagePath,
                 courseId, teacherId, answers);
+        data.setImageData(imageData);
         client.sendToServer(Command.CREATE_QUESTION, data);
     }
 
@@ -60,6 +61,7 @@ public class QuestionClientController implements ResponseHandler {
         EditQuestionData data = new EditQuestionData(question.getQuestionId(), question.getText(),
                 question.getInstructions(), question.getDifficulty(), question.getTopic(),
                 question.getImagePath(), teacherId, question.getAnswers());
+        data.setImageData(question.getImageData());
         client.sendToServer(Command.EDIT_QUESTION, data);
     }
 

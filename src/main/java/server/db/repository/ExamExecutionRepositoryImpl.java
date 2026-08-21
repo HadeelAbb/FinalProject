@@ -73,16 +73,34 @@ public class ExamExecutionRepositoryImpl {
         return results;
     }
 
-    /** Finds the still-usable execution matching this code for this exam - the code alone isn't
-     * guaranteed unique across all exams ever, so both are checked together. */
+    /** Finds the still-usable execution matching this code for this exam. */
     public Optional<ExamExecution> findByExamIdAndCode(String examId, String code) {
-        String sql = "SELECT * FROM exam_executions WHERE exam_id = ? AND execution_code = ?";
+        String sql = "SELECT * FROM exam_executions WHERE exam_id = ? AND LOWER(execution_code) = LOWER(?)";
         Connection conn = dbManager.getConnection();
         if (conn == null) return Optional.empty();
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, examId);
             stmt.setString(2, code);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return Optional.empty();
+    }
+
+    /** Production student/code lookup: execution code is unique across exam_executions. */
+    public Optional<ExamExecution> findByCode(String code) {
+        String sql = "SELECT * FROM exam_executions WHERE LOWER(execution_code) = LOWER(?)";
+        Connection conn = dbManager.getConnection();
+        if (conn == null) return Optional.empty();
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, code);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapRow(rs));

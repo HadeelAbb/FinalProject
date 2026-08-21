@@ -87,7 +87,13 @@ public class BotApiClient {
 
             return extractContent(response.body());
         } catch (Exception e) {
-            System.err.println("[BOT] API call failed: " + e.getMessage());
+            System.err.println(
+                    "[BOT] API call failed: "
+                            + e.getClass().getName()
+                            + ": "
+                            + e.getMessage()
+            );
+            e.printStackTrace();
             return null;
         }
     }

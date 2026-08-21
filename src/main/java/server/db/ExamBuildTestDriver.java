@@ -39,13 +39,19 @@ public class ExamBuildTestDriver {
         // -------------------------------------------------------------
         System.out.println("👉 TEST 1: Creating Manual Exam Draft (SUC-2)...");
         List<String> questionIds = Arrays.asList("11001", "11002", "11003");
+        java.util.Map<String, Integer> questionPoints = new java.util.LinkedHashMap<>();
+        questionPoints.put("11001", 40);
+        questionPoints.put("11002", 30);
+        questionPoints.put("11003", 30);
 
         CreateExamManualData manualData = new CreateExamManualData(
                 "teacher1",
                 "CS101",
                 "Manual Midterm Test",
                 "Read questions carefully.",
+                null,
                 questionIds,
+                questionPoints,
                 45
         );
 
