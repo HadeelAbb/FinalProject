@@ -1,11 +1,15 @@
+# Build output & compiled binaries
 target/
 *.jar
-!executables/*.jar
-!executables/*.bat
+*.war
 build/
 out/
 *.rar
 *.class
+
+# Release & executable bundles
+executables/
+*.bat
 
 # IntelliJ
 .idea/
@@ -13,6 +17,11 @@ out/
 
 # DB credentials - never commit this
 src/main/resources/config.properties
+# Configuration, environment files & secrets
+config.properties
+**/config.properties
+*.properties
+*.env
 
 # OS junk
 .DS_Store
