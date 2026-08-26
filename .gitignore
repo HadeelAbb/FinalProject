@@ -1,4 +1,7 @@
 target/
+*.jar
+!executables/*.jar
+!executables/*.bat
 build/
 out/
 *.rar

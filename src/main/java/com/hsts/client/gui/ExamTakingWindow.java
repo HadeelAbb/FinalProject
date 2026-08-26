@@ -34,6 +34,7 @@ public class ExamTakingWindow {
     @FXML private Button logoutButton;
     @FXML private ListView<Exam> availableExamsView;
     @FXML private TextField executionCodeField;
+    @FXML private TextField studentIdField;
     @FXML private ListView<Question> questionsView;
     @FXML private Label instructionsLabel;
     @FXML private Label timerLabel;
@@ -98,6 +99,19 @@ public class ExamTakingWindow {
             showError("Select an exam first.");
             return;
         }
+
+        String studentId = studentIdField != null && studentIdField.getText() != null
+                ? studentIdField.getText().trim()
+                : "";
+        if (studentId.isEmpty()) {
+            showError("Please enter your Student ID.");
+            return;
+        }
+        if (navUser != null && !studentId.equalsIgnoreCase(navUser.getId())) {
+            showError("Entered Student ID does not match the logged-in student account.");
+            return;
+        }
+
         String code = executionCodeField.getText() != null
                 ? executionCodeField.getText().trim().toUpperCase()
                 : "";
@@ -105,6 +119,7 @@ public class ExamTakingWindow {
             showError("Enter the 4-character execution code for this exam.");
             return;
         }
+
         startButton.setDisable(true);
         controller.startExam(selected.getExamId(), code);
     }
@@ -127,6 +142,9 @@ public class ExamTakingWindow {
             statusLabel.setText("Exam time has expired - submitting...");
             doSubmit(true);
             return;
+        }
+        if (studentIdField != null) {
+            studentIdField.setDisable(true);
         }
         startTimer(remaining);
     }
@@ -208,6 +226,11 @@ public class ExamTakingWindow {
         executionCodeField.setDisable(false);
         executionCodeField.clear();
         controller.loadAvailableExams();
+
+        if (studentIdField != null) {
+            studentIdField.setDisable(false);
+            studentIdField.clear();
+        }
     }
 
     public void showError(String message) {

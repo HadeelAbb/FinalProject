@@ -63,7 +63,8 @@
                 <Button fx:id="botConfigButton"
                         text="Configure Study Bot"
                         onAction="#handleBotConfig"
-                        maxWidth="Infinity" />
+                        maxWidth="Infinity"
+                        styleClass="action-button"/>
             </VBox>
 
             <VBox fx:id="principalSection" spacing="8">

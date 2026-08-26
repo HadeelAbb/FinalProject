@@ -142,11 +142,16 @@ public class BotChatWindow {
                 .filter(i -> selected.getId().equalsIgnoreCase(i.getCourseId()))
                 .sorted((a, b) -> {
                     if (a.getAskedAt() == null || b.getAskedAt() == null) return 0;
-                    return b.getAskedAt().compareTo(a.getAskedAt());
+                    return a.getAskedAt().compareTo(b.getAskedAt()); // Oldest first, newest at the bottom
                 })
                 .toList();
 
         historyView.getItems().setAll(filtered);
+
+        // Automatically scroll to the latest message at the bottom
+        if (!filtered.isEmpty()) {
+            historyView.scrollTo(filtered.size() - 1);
+        }
     }
 
     @FXML

@@ -31,6 +31,8 @@
             <ListView fx:id="availableExamsView" prefHeight="360"/>
             <Label text="Execution code:"/>
             <TextField fx:id="executionCodeField" promptText="4-character code" maxWidth="140"/>
+            <Label text="Student ID:"/>
+            <TextField fx:id="studentIdField" promptText="e.g. student1" prefWidth="120"/>
             <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam" styleClass="primary-button"/>
         </VBox>
     </left>
