@@ -20,7 +20,7 @@ public class DatabaseManager {
     private Connection connection = null;
 
     // The network address pointing to port 3306 on your own laptop's hard drive disk (localhost)
-    private  String dbUrl = "jdbc:mysql://localhost:3306/hsts_db?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true";
+    private String dbUrl = "jdbc:mysql://localhost:3306/hsts_db?serverTimezone=Asia/Jerusalem&useSSL=false&allowPublicKeyRetrieval=true";
     private  String dbUser;
     private  String dbPassword;
 
