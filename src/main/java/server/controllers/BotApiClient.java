@@ -19,7 +19,7 @@ import java.util.Properties;
 public class BotApiClient {
 
     private static final String API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String MODEL = "llama-3.3-70b-versatile";
+    private static final String MODEL = "openai/gpt-oss-20b";
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -51,15 +51,32 @@ public class BotApiClient {
      * the key is missing, the call fails, or no suitable answer came back -
      * callers should show the spec's "no suitable answer" message in that case.
      */
-    public String ask(String studentQuestion, String courseContext) {
+    //** update: to accept knowledge sources alongside the course context,
+    // grounding the LLM output with the teacher's curriculum notes
+    // **
+    public String ask(String studentQuestion, String courseContext, String knowledgeSources) {
         if (apiKey == null) {
             return null;
         }
         try {
-            String systemPrompt = "You are a study assistant helping a high school student with their "
-                    + "coursework" + (courseContext != null ? " for course " + courseContext : "")
-                    + ". Answer clearly and concisely, in a way appropriate for a student. "
-                    + "If the question is unrelated to schoolwork, politely redirect them to ask something study-related.";
+            StringBuilder promptBuilder = new StringBuilder();
+            promptBuilder.append("You are a study assistant helping a high school student with their coursework");
+            if (courseContext != null && !courseContext.isBlank()) {
+                promptBuilder.append(" for course ").append(courseContext);
+            }
+            promptBuilder.append(". ");
+
+// THIS IS THE NEW PART: Attach the teacher's knowledge sources if they exist
+            if (knowledgeSources != null && !knowledgeSources.isBlank()) {
+                promptBuilder.append("The course teacher has defined the following curriculum materials and focus areas: [")
+                        .append(knowledgeSources.trim())
+                        .append("]. Base your answers strictly on these materials when applicable. ");
+            }
+
+            promptBuilder.append("Answer clearly and concisely, in a way appropriate for a student. ")
+                    .append("If the question is unrelated to schoolwork, politely redirect them to ask something study-related.");
+
+            String systemPrompt = promptBuilder.toString();
 
             String body = "{"
                     + "\"model\":\"" + MODEL + "\","

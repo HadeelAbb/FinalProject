@@ -22,6 +22,7 @@ import com.hsts.shared.net.dto.GetPendingGradingData;
 import com.hsts.shared.net.dto.StartExamData;
 import com.hsts.shared.net.dto.SubmitExamData;
 import com.hsts.shared.net.dto.SubmitExamForApprovalData;
+import com.hsts.shared.net.dto.UpdateBotConfigData;
 
 /**
  * Pattern A: actor identity on a DTO is data, not proof.
@@ -85,6 +86,8 @@ public final class RequestIdentityBinder {
             data.setTeacherId(userId);
         } else if (payload instanceof ExamApprovalDecisionData data) {
             data.setCoordinatorId(userId);
+        } else if (payload instanceof UpdateBotConfigData data) {
+             data.setTeacherId(userId);
         }
     }
 }

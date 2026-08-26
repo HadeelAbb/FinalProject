@@ -6,14 +6,19 @@ import com.hsts.client.network.ServerConnection;
 import com.hsts.shared.model.BotInteraction;
 import com.hsts.shared.model.Course;
 import com.hsts.shared.model.Student;
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
+import javafx.geometry.Insets;
+import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BotChatWindow {
@@ -21,7 +26,7 @@ public class BotChatWindow {
     @FXML private Button backButton;
     @FXML private Button logoutButton;
     @FXML private ComboBox<Course> courseSelector;
-    @FXML private ListView<String> historyView;
+    @FXML private ListView<BotInteraction> historyView;
     @FXML private TextArea questionField;
     @FXML private Button askButton;
     @FXML private Label statusLabel;
@@ -31,9 +36,10 @@ public class BotChatWindow {
     private Student navUser;
     private ServerConnection navClient;
     private LoginClientController navLoginController;
+    private final List<BotInteraction> fullHistory = new ArrayList<>();
 
     public void init(BotChatClientController controller, Student student,
-                      ServerConnection client, LoginClientController loginController) {
+                     ServerConnection client, LoginClientController loginController) {
         this.controller = controller;
         this.navUser = student;
         this.navClient = client;
@@ -41,13 +47,106 @@ public class BotChatWindow {
         controller.setCurrentStudent(student);
         controller.setView(this);
 
-        historyView.setPlaceholder(new Label("No questions asked yet."));
+        setupCourseSelector(student);
+        setupChatBubbleCellFactory();
+
+        controller.refreshHistory();
+    }
+
+    private void setupCourseSelector(Student student) {
+        courseSelector.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Course item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getId() + " - " + item.getName());
+            }
+        });
+        courseSelector.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Course item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item.getId() + " - " + item.getName());
+            }
+        });
+
         courseSelector.getItems().setAll(student.getCourses());
         if (!student.getCourses().isEmpty()) {
             courseSelector.getSelectionModel().selectFirst();
         }
 
-        controller.refreshHistory();
+        courseSelector.setOnAction(e -> filterHistoryForCurrentCourse());
+    }
+
+    private void setupChatBubbleCellFactory() {
+        historyView.setPlaceholder(new Label("No conversation history yet for this course."));
+        historyView.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(BotInteraction item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                    return;
+                }
+
+                VBox container = new VBox(8);
+                container.setPadding(new Insets(10));
+                container.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-border-color: #dfe6e9; -fx-border-radius: 8;");
+                container.prefWidthProperty().bind(historyView.widthProperty().subtract(40));
+
+                // Student Question Bubble
+                Text qHeader = new Text("You asked: ");
+                qHeader.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+                qHeader.setFill(Color.web("#2980b9"));
+
+                Text qText = new Text(item.getQuestion() != null ? item.getQuestion() : "");
+                qText.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
+                qText.setFill(Color.web("#2c3e50"));
+
+                TextFlow questionFlow = new TextFlow(qHeader, qText);
+                questionFlow.setStyle("-fx-background-color: #ebf5fb; -fx-padding: 8; -fx-background-radius: 6;");
+
+                // Bot Answer Section
+                Text aHeader = new Text("🤖 Study Bot:\n");
+                aHeader.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+                aHeader.setFill(Color.web("#27ae60"));
+
+                String cleanAnswer = cleanMarkdown(item.getAnswer());
+                Text aText = new Text(cleanAnswer);
+                aText.setFont(Font.font("Segoe UI", 13));
+                aText.setFill(Color.web("#34495e"));
+
+                TextFlow answerFlow = new TextFlow(aHeader, aText);
+                answerFlow.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 8; -fx-background-radius: 6;");
+
+                container.getChildren().addAll(questionFlow, answerFlow);
+                setGraphic(container);
+                setText(null);
+            }
+        });
+    }
+
+    private String cleanMarkdown(String raw) {
+        if (raw == null) return "";
+        return raw.replace("**", "").replace("###", "").trim();
+    }
+
+    private void filterHistoryForCurrentCourse() {
+        Course selected = courseSelector.getValue();
+        if (selected == null) {
+            historyView.getItems().clear();
+            return;
+        }
+
+        List<BotInteraction> filtered = fullHistory.stream()
+                .filter(i -> selected.getId().equalsIgnoreCase(i.getCourseId()))
+                .sorted((a, b) -> {
+                    if (a.getAskedAt() == null || b.getAskedAt() == null) return 0;
+                    return b.getAskedAt().compareTo(a.getAskedAt());
+                })
+                .toList();
+
+        historyView.getItems().setAll(filtered);
     }
 
     @FXML
@@ -74,7 +173,7 @@ public class BotChatWindow {
         }
         askButton.setDisable(true);
         statusLabel.setText("Asking the bot...");
-        controller.ask(course.getId(), questionField.getText());
+        controller.ask(course.getId(), questionField.getText().trim());
     }
 
     @FXML
@@ -83,23 +182,30 @@ public class BotChatWindow {
     }
 
     public void onAnswerReceived(BotInteraction interaction) {
-        askButton.setDisable(false);
-        statusLabel.setText("Answered.");
-        questionField.clear();
-        errorLabel.setText("");
+        Platform.runLater(() -> {
+            askButton.setDisable(false);
+            statusLabel.setText("");
+            questionField.clear();
+            errorLabel.setText("");
+            controller.refreshHistory();
+        });
     }
 
     public void displayHistory(List<BotInteraction> history) {
-        List<String> lines = history.stream()
-                .sorted((a, b) -> b.getAskedAt().compareTo(a.getAskedAt()))
-                .map(i -> "[" + i.getCourseId() + "] Q: " + i.getQuestion() + "\n  A: " + i.getAnswer())
-                .toList();
-        historyView.getItems().setAll(lines);
+        Platform.runLater(() -> {
+            fullHistory.clear();
+            if (history != null) {
+                fullHistory.addAll(history);
+            }
+            filterHistoryForCurrentCourse();
+        });
     }
 
     public void showError(String message) {
-        askButton.setDisable(false);
-        errorLabel.setText(message);
-        statusLabel.setText("");
+        Platform.runLater(() -> {
+            askButton.setDisable(false);
+            errorLabel.setText(message);
+            statusLabel.setText("");
+        });
     }
 }

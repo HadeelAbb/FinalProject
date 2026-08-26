@@ -59,6 +59,10 @@ import server.controllers.RequestAuthorizer;
 import server.controllers.RequestIdentityBinder;
 import server.db.DatabaseManager;
 import server.db.repository.BotRepositoryImpl;
+import com.hsts.shared.model.CourseBotConfig;
+import com.hsts.shared.net.dto.GetBotConfigData;
+import com.hsts.shared.net.dto.UpdateBotConfigData;
+import server.db.repository.BotConfigRepositoryImpl;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -73,6 +77,8 @@ public class MainServerApp {
 
     private static final int PORT = 3000;
     private static final String DEFAULT_COURSE_ID = "11";
+    private static final server.db.repository.BotConfigRepositoryImpl botConfigRepository =
+            new server.db.repository.BotConfigRepositoryImpl();
 
     public static void main(String[] args) {
         System.out.println("=== INITIALIZING PRODUCTION HSTS CENTRAL SERVER ===");
@@ -88,6 +94,7 @@ public class MainServerApp {
         QuestionServerController questionServerController = new QuestionServerController();
         ExamServerController examServerController = new ExamServerController();
         BotRepositoryImpl botRepository = new BotRepositoryImpl();
+
 
         ServerRequestRouter router = new ServerRequestRouter();
         HSTSServer server = new HSTSServer(PORT);
@@ -1038,12 +1045,21 @@ public class MainServerApp {
                                 request.getRequestId());
                     }
 
+                    // SUC-13 / Req 13: Check course bot configuration and pull knowledge sources[cite: 101, 103, 104]
+                    java.util.Optional<com.hsts.shared.model.CourseBotConfig> configOpt =
+                            botConfigRepository.findByCourseId(data.getCourseId());
+                    if (configOpt.isPresent() && !configOpt.get().isActive()) {
+                        return Response.failure(Command.ASK_BOT_QUESTION,
+                                "The Study Bot for this course is currently disabled by the teacher.",
+                                request.getRequestId());
+                    }
+
+                    String knowledgeSources = configOpt.map(com.hsts.shared.model.CourseBotConfig::getKnowledgeSources).orElse(null);
+
                     String interactionId = "BOT-" + UUID.randomUUID().toString().substring(0, 8);
-                    // SUC-14: real external AI API call, per the spec's requirement
-                    // to use an existing bot rather than build one. Falls back to a
-                    // clear message if the key is missing or the call fails/returns
-                    // nothing usable - the spec explicitly allows for that case.
-                    String realAnswer = botApiClient.ask(data.getQuestion(), data.getCourseId());
+
+                    // SUC-14: Query LLM with question, course context, and teacher knowledge sources[cite: 74, 103]
+                    String realAnswer = botApiClient.ask(data.getQuestion(), data.getCourseId(), knowledgeSources);
                     String finalAnswer = realAnswer != null ? realAnswer
                             : "Sorry, I couldn't come up with a good answer to that right now. "
                               + "Please try rephrasing your question, or check with your instructor.";
@@ -1076,6 +1092,60 @@ public class MainServerApp {
                         "Database error: " + e.getMessage(),
                         request.getRequestId()
                 );
+            }
+        });
+        // SUC-13 / Req 13: Fetch Bot Configuration for a Course[cite: 101, 103]
+        router.registerHandler(Command.GET_BOT_CONFIG, request -> {
+            try {
+                if (request.getPayload() instanceof com.hsts.shared.net.dto.GetBotConfigData data) {
+                    java.util.Optional<com.hsts.shared.model.CourseBotConfig> configOpt =
+                            botConfigRepository.findByCourseId(data.getCourseId());
+
+                    com.hsts.shared.model.CourseBotConfig config = configOpt.orElseGet(() ->
+                            new com.hsts.shared.model.CourseBotConfig(data.getCourseId(), data.getCourseId() + " Study Bot", "", true, null)
+                    );
+
+                    return Response.success(Command.GET_BOT_CONFIG, config, null, request.getRequestId());
+                }
+
+                return Response.failure(Command.GET_BOT_CONFIG, "Invalid payload for GET_BOT_CONFIG.", request.getRequestId());
+            } catch (Exception e) {
+                return Response.failure(Command.GET_BOT_CONFIG, "Database error: " + e.getMessage(), request.getRequestId());
+            }
+        });
+
+// SUC-13 / Req 13: Update Bot Knowledge Sources and Active State[cite: 101, 103]
+        router.registerHandler(Command.UPDATE_BOT_CONFIG, request -> {
+            try {
+                if (request.getPayload() instanceof com.hsts.shared.net.dto.UpdateBotConfigData data) {
+                    if (!examServerController.isTeacherAssignedToCourse(data.getTeacherId(), data.getCourseId())) {
+                        return Response.failure(Command.UPDATE_BOT_CONFIG,
+                                "You do not teach course " + data.getCourseId() + ".", request.getRequestId());
+                    }
+
+                    if (data.getBotName() == null || data.getBotName().isBlank()) {
+                        return Response.failure(Command.UPDATE_BOT_CONFIG, "Bot name is required.", request.getRequestId());
+                    }
+
+                    com.hsts.shared.model.CourseBotConfig config = new com.hsts.shared.model.CourseBotConfig(
+                            data.getCourseId(),
+                            data.getBotName().trim(),
+                            data.getKnowledgeSources() != null ? data.getKnowledgeSources().trim() : "",
+                            data.isActive(),
+                            data.getTeacherId()
+                    );
+
+                    boolean ok = botConfigRepository.saveOrUpdate(config);
+                    if (!ok) {
+                        return Response.failure(Command.UPDATE_BOT_CONFIG, "Failed to save bot configuration.", request.getRequestId());
+                    }
+
+                    return Response.success(Command.UPDATE_BOT_CONFIG, config, "Bot configuration updated successfully.", request.getRequestId());
+                }
+
+                return Response.failure(Command.UPDATE_BOT_CONFIG, "Invalid payload for UPDATE_BOT_CONFIG.", request.getRequestId());
+            } catch (Exception e) {
+                return Response.failure(Command.UPDATE_BOT_CONFIG, "Database error: " + e.getMessage(), request.getRequestId());
             }
         });
 

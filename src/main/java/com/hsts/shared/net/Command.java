@@ -47,6 +47,8 @@ public enum Command {
     ASK_BOT_QUESTION,
     GET_BOT_HISTORY,
     GET_BOT_USAGE_STATS,
+    GET_BOT_CONFIG, //(to fetch a course's bot settings)
+    UPDATE_BOT_CONFIG, //(to save modified bot settings/sources)
 
     // NEW: generic broadcast event, published by the server-side EventBus
     // whenever exam status, grading, or timing changes in a way that

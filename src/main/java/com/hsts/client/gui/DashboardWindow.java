@@ -49,6 +49,7 @@ public class DashboardWindow {
     @FXML private Button myResultsButton;
     @FXML private Button extendTimeButton;
     @FXML private Button botStatsButton;
+    @FXML private Button botConfigButton;
     @FXML private Button botChatButton;
     @FXML private Button principalOverviewButton;
     @FXML private Button principalComparisonButton;
@@ -89,6 +90,8 @@ public class DashboardWindow {
         extendTimeButton.setManaged(isTeacher);
         botStatsButton.setVisible(isTeacher);
         botStatsButton.setManaged(isTeacher);
+        botConfigButton.setVisible(isTeacher);
+        botConfigButton.setManaged(isTeacher);
         botChatButton.setVisible(isStudent);
         botChatButton.setManaged(isStudent);
         principalOverviewButton.setVisible(isPrincipal);
@@ -296,7 +299,12 @@ public class DashboardWindow {
             showError("Could not open comparison reports screen.");
         }
     }
-
+    @FXML
+    void handleBotConfig(ActionEvent event) {
+        Stage stage = (Stage) welcomeLabel.getScene().getWindow();
+        BotConfigWindow window = new BotConfigWindow(client, user, loginController);
+        window.show(stage);
+    }
     @FXML
     void handlePrincipalQuestionBank(ActionEvent event) {
         try {

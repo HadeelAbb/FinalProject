@@ -57,6 +57,8 @@ public final class RequestAuthorizer {
         ROLES.put(Command.GET_ALL_QUESTIONS, new String[]{AuthenticatedSession.PRINCIPAL});
         ROLES.put(Command.GET_EXAM_STATS, new String[]{
                 AuthenticatedSession.TEACHER, AuthenticatedSession.PRINCIPAL});
+        ROLES.put(Command.GET_BOT_CONFIG, new String[]{AuthenticatedSession.TEACHER});
+        ROLES.put(Command.UPDATE_BOT_CONFIG, new String[]{AuthenticatedSession.TEACHER});
     }
 
     private RequestAuthorizer() {
