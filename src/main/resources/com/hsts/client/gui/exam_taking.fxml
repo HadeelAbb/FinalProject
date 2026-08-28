@@ -25,28 +25,28 @@
         </VBox>
     </top>
 
-    <left>
-        <VBox spacing="6" style="-fx-padding: 10;" prefWidth="280">
-            <Label text="Available exams:"/>
-            <ListView fx:id="availableExamsView" prefHeight="360"/>
-            <Label text="Execution code:"/>
-            <TextField fx:id="executionCodeField" promptText="4-character code" maxWidth="140"/>
-            <Label text="Student ID:"/>
-            <TextField fx:id="studentIdField" promptText="e.g. student1" prefWidth="120"/>
-            <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam" styleClass="primary-button"/>
-        </VBox>
-    </left>
-
     <center>
-        <VBox spacing="10" style="-fx-padding: 10;">
-            <Label fx:id="instructionsLabel" wrapText="true" style="-fx-font-style: italic;"/>
-            <ListView fx:id="questionsView" prefHeight="380"/>
-            <HBox spacing="8">
-                <Button fx:id="submitButton" onAction="#handleSubmit" text="Submit exam" disable="true" styleClass="primary-button"/>
-            </HBox>
-            <Label fx:id="statusLabel" styleClass="status-success"/>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+        <HBox spacing="0">
+            <VBox spacing="6" style="-fx-padding: 10;" prefWidth="280" HBox.hgrow="ALWAYS">
+                <Label text="Available exams:"/>
+                <ListView fx:id="availableExamsView" prefHeight="360" VBox.vgrow="ALWAYS"/>
+                <Label text="Execution code:"/>
+                <TextField fx:id="executionCodeField" promptText="4-character code" maxWidth="140"/>
+                <Label text="Student ID:"/>
+                <TextField fx:id="studentIdField" promptText="e.g. student1" prefWidth="120"/>
+                <Button fx:id="startButton" onAction="#handleStart" text="Start selected exam" styleClass="primary-button"/>
+            </VBox>
+
+            <VBox spacing="10" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label fx:id="instructionsLabel" wrapText="true" style="-fx-font-style: italic;"/>
+                <ListView fx:id="questionsView" prefHeight="380" VBox.vgrow="ALWAYS"/>
+                <HBox spacing="8">
+                    <Button fx:id="submitButton" onAction="#handleSubmit" text="Submit exam" disable="true" styleClass="primary-button"/>
+                </HBox>
+                <Label fx:id="statusLabel" styleClass="status-success"/>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>

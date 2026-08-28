@@ -49,54 +49,54 @@
         </VBox>
     </top>
 
-    <left>
-        <VBox spacing="8" style="-fx-padding: 10;" prefWidth="340">
-            <VBox fx:id="manualModeBox" spacing="8">
-                <Label text="Manual mode: check questions and assign points"/>
-                <ListView fx:id="questionListView" prefHeight="360"/>
-                <Label fx:id="pointsTotalLabel" text="Total: 0 / 100" wrapText="true"/>
-            </VBox>
-
-            <VBox fx:id="autoModeBox" spacing="8">
-                <Label text="Automatic mode: filter criteria"/>
-                <Label text="Each question gets 100 ÷ count points. Count must divide 100." wrapText="true"/>
-                <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="Topic:"/>
-                    <TextField fx:id="autoTopicField" prefWidth="120"/>
-                </HBox>
-                <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="Difficulty:"/>
-                    <ComboBox fx:id="autoDifficultySelector" promptText="Any"/>
-                    <Label text="Count:"/>
-                    <Spinner fx:id="autoCountSpinner" prefWidth="70" editable="true"/>
-                </HBox>
-            </VBox>
-        </VBox>
-    </left>
-
     <center>
-        <VBox spacing="8" style="-fx-padding: 10;">
-            <Label text="Instructions for students:"/>
-            <TextArea fx:id="instructionsField" prefHeight="100" wrapText="true"/>
+        <HBox spacing="0">
+            <VBox spacing="8" style="-fx-padding: 10;" prefWidth="340" HBox.hgrow="ALWAYS">
+                <VBox fx:id="manualModeBox" spacing="8" VBox.vgrow="ALWAYS">
+                    <Label text="Manual mode: check questions and assign points"/>
+                    <ListView fx:id="questionListView" prefHeight="360" VBox.vgrow="ALWAYS"/>
+                    <Label fx:id="pointsTotalLabel" text="Total: 0 / 100" wrapText="true"/>
+                </VBox>
 
-            <Label text="Notes for yourself (teachers only - never shown to students):"/>
-            <TextArea fx:id="teacherNotesField" prefHeight="70" wrapText="true"/>
+                <VBox fx:id="autoModeBox" spacing="8">
+                    <Label text="Automatic mode: filter criteria"/>
+                    <Label text="Each question gets 100 ÷ count points. Count must divide 100." wrapText="true"/>
+                    <HBox spacing="6" alignment="CENTER_LEFT">
+                        <Label text="Topic:"/>
+                        <TextField fx:id="autoTopicField" prefWidth="120"/>
+                    </HBox>
+                    <HBox spacing="6" alignment="CENTER_LEFT">
+                        <Label text="Difficulty:"/>
+                        <ComboBox fx:id="autoDifficultySelector" promptText="Any"/>
+                        <Label text="Count:"/>
+                        <Spinner fx:id="autoCountSpinner" prefWidth="70" editable="true"/>
+                    </HBox>
+                </VBox>
+            </VBox>
 
-            <HBox spacing="8">
-                <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)" styleClass="primary-button"/>
-                <Button fx:id="saveVersionButton" onAction="#handleSaveVersion"
-                        text="Save as new version" disable="true" styleClass="primary-button"/>
-                <Button fx:id="reviewDraftButton" onAction="#handleReviewDraft"
-                        text="Review Draft" disable="true" styleClass="action-button"/>
-                <Button fx:id="submitForApprovalButton" onAction="#handleSubmitForApproval"
-                        text="Submit for approval" disable="true" styleClass="action-button"/>
-            </HBox>
+            <VBox spacing="8" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label text="Instructions for students:"/>
+                <TextArea fx:id="instructionsField" prefHeight="100" wrapText="true" VBox.vgrow="ALWAYS"/>
 
-            <Label text="Current draft:" style="-fx-font-weight: bold;"/>
-            <Label fx:id="draftSummaryLabel" wrapText="true"/>
-            <Label fx:id="statusLabel" styleClass="status-success"/>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+                <Label text="Notes for yourself (teachers only - never shown to students):"/>
+                <TextArea fx:id="teacherNotesField" prefHeight="70" wrapText="true"/>
+
+                <HBox spacing="8">
+                    <Button fx:id="createButton" onAction="#handleCreate" text="Create exam (draft)" styleClass="primary-button"/>
+                    <Button fx:id="saveVersionButton" onAction="#handleSaveVersion"
+                            text="Save as new version" disable="true" styleClass="primary-button"/>
+                    <Button fx:id="reviewDraftButton" onAction="#handleReviewDraft"
+                            text="Review Draft" disable="true" styleClass="action-button"/>
+                    <Button fx:id="submitForApprovalButton" onAction="#handleSubmitForApproval"
+                            text="Submit for approval" disable="true" styleClass="action-button"/>
+                </HBox>
+
+                <Label text="Current draft:" style="-fx-font-weight: bold;"/>
+                <Label fx:id="draftSummaryLabel" wrapText="true"/>
+                <Label fx:id="statusLabel" styleClass="status-success"/>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>

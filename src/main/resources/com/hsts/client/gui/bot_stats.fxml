@@ -24,7 +24,7 @@
             <Label text="Counts per course - individual students are never identified here."
                    style="-fx-text-fill: #666;" wrapText="true"/>
 
-            <ListView fx:id="statsListView" prefHeight="360"/>
+            <ListView fx:id="statsListView" prefHeight="360" VBox.vgrow="ALWAYS"/>
             <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
 
             <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>

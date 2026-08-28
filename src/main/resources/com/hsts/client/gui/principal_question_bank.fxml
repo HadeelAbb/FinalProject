@@ -38,11 +38,11 @@
         <HBox spacing="12" style="-fx-padding: 8 16 12 16;">
             <VBox spacing="6" HBox.hgrow="ALWAYS">
                 <Label text="Questions" style="-fx-font-weight: bold;"/>
-                <TableView fx:id="questionTable" prefHeight="480"/>
+                <TableView fx:id="questionTable" prefHeight="480" VBox.vgrow="ALWAYS"/>
             </VBox>
-            <VBox spacing="6" prefWidth="420">
+            <VBox spacing="6" prefWidth="420" HBox.hgrow="ALWAYS">
                 <Label text="Selected Question" style="-fx-font-weight: bold;"/>
-                <TextArea fx:id="detailArea" wrapText="true" editable="false" prefHeight="280"/>
+                <TextArea fx:id="detailArea" wrapText="true" editable="false" prefHeight="280" VBox.vgrow="ALWAYS"/>
                 <Label text="Illustration (read-only)" style="-fx-text-fill: #555;"/>
                 <ImageView fx:id="illustrationView" fitWidth="400" fitHeight="180" preserveRatio="true"/>
             </VBox>

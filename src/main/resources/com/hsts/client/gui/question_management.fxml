@@ -41,59 +41,59 @@
         </VBox>
     </top>
 
-    <left>
-        <ListView fx:id="questionListView" prefWidth="320" BorderPane.alignment="CENTER"/>
-    </left>
-
     <center>
-        <VBox spacing="8" style="-fx-padding: 10;">
-            <Label text="Question text:"/>
-            <TextArea fx:id="questionTextField" prefHeight="60" wrapText="true"/>
+        <HBox spacing="0">
+            <ListView fx:id="questionListView" prefWidth="320" HBox.hgrow="ALWAYS"/>
 
-            <Label text="Instructions:"/>
-            <TextArea fx:id="instructionsField" prefHeight="40" wrapText="true"/>
+            <VBox spacing="8" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label text="Question text:"/>
+                <TextArea fx:id="questionTextField" prefHeight="60" wrapText="true" VBox.vgrow="ALWAYS"/>
 
-            <Label text="Answers (select the correct one):"/>
-            <GridPane hgap="8" vgap="6">
-                <RadioButton fx:id="answer1Correct" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                <TextField fx:id="answer1Field" GridPane.columnIndex="1" GridPane.rowIndex="0" prefWidth="320"/>
+                <Label text="Instructions:"/>
+                <TextArea fx:id="instructionsField" prefHeight="40" wrapText="true"/>
 
-                <RadioButton fx:id="answer2Correct" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                <TextField fx:id="answer2Field" GridPane.columnIndex="1" GridPane.rowIndex="1" prefWidth="320"/>
+                <Label text="Answers (select the correct one):"/>
+                <GridPane hgap="8" vgap="6">
+                    <RadioButton fx:id="answer1Correct" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                    <TextField fx:id="answer1Field" GridPane.columnIndex="1" GridPane.rowIndex="0" prefWidth="320"/>
 
-                <RadioButton fx:id="answer3Correct" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                <TextField fx:id="answer3Field" GridPane.columnIndex="1" GridPane.rowIndex="2" prefWidth="320"/>
+                    <RadioButton fx:id="answer2Correct" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                    <TextField fx:id="answer2Field" GridPane.columnIndex="1" GridPane.rowIndex="1" prefWidth="320"/>
 
-                <RadioButton fx:id="answer4Correct" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-                <TextField fx:id="answer4Field" GridPane.columnIndex="1" GridPane.rowIndex="3" prefWidth="320"/>
-            </GridPane>
+                    <RadioButton fx:id="answer3Correct" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                    <TextField fx:id="answer3Field" GridPane.columnIndex="1" GridPane.rowIndex="2" prefWidth="320"/>
 
-            <HBox alignment="CENTER_LEFT" spacing="8">
-                <Label text="Difficulty:"/>
-                <ComboBox fx:id="difficultySelector"/>
-                <Label text="Topic:"/>
-                <TextField fx:id="topicField" prefWidth="140"/>
-                <Label text="Course:"/>
-                <ComboBox fx:id="courseSelector"/>
-            </HBox>
+                    <RadioButton fx:id="answer4Correct" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+                    <TextField fx:id="answer4Field" GridPane.columnIndex="1" GridPane.rowIndex="3" prefWidth="320"/>
+                </GridPane>
 
-            <Label fx:id="versionLabel" style="-fx-text-fill: #555;"/>
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <Label text="Difficulty:"/>
+                    <ComboBox fx:id="difficultySelector"/>
+                    <Label text="Topic:"/>
+                    <TextField fx:id="topicField" prefWidth="140"/>
+                    <Label text="Course:"/>
+                    <ComboBox fx:id="courseSelector"/>
+                </HBox>
 
-            <HBox alignment="CENTER_LEFT" spacing="8">
-                <Label text="Illustration (optional PNG/JPG):"/>
-                <Button fx:id="browseImageButton" onAction="#handleBrowseImage" text="Choose image..."/>
-                <Label fx:id="imageFileLabel" text="No illustration" style="-fx-text-fill: #555;"/>
-            </HBox>
-            <ImageView fx:id="illustrationView" fitWidth="320" fitHeight="180" preserveRatio="true"/>
+                <Label fx:id="versionLabel" style="-fx-text-fill: #555;"/>
 
-            <HBox spacing="10">
-                <Button fx:id="saveButton" onAction="#handleSaveQuestion" text="Save" styleClass="primary-button"/>
-                <Button fx:id="deleteButton" onAction="#handleDeleteQuestion" text="Delete" styleClass="action-button"/>
-            </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <Label text="Illustration (optional PNG/JPG):"/>
+                    <Button fx:id="browseImageButton" onAction="#handleBrowseImage" text="Choose image..."/>
+                    <Label fx:id="imageFileLabel" text="No illustration" style="-fx-text-fill: #555;"/>
+                </HBox>
+                <ImageView fx:id="illustrationView" fitWidth="320" fitHeight="180" preserveRatio="true"/>
 
-            <Label fx:id="statusLabel" styleClass="status-success" wrapText="true"/>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+                <HBox spacing="10">
+                    <Button fx:id="saveButton" onAction="#handleSaveQuestion" text="Save" styleClass="primary-button"/>
+                    <Button fx:id="deleteButton" onAction="#handleDeleteQuestion" text="Delete" styleClass="action-button"/>
+                </HBox>
+
+                <Label fx:id="statusLabel" styleClass="status-success" wrapText="true"/>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>

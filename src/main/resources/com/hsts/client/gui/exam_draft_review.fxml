@@ -22,7 +22,7 @@
             <Label fx:id="titleLabel" wrapText="true" style="-fx-font-weight: bold; -fx-font-size: 15px;"/>
             <Label fx:id="metaLabel" wrapText="true"/>
             <Label text="Questions:" style="-fx-font-weight: bold;"/>
-            <ScrollPane fitToWidth="true" prefHeight="420" styleClass="card">
+            <ScrollPane fitToWidth="true" prefHeight="420" styleClass="card" VBox.vgrow="ALWAYS">
                 <VBox fx:id="questionsBox" spacing="14" style="-fx-padding: 10;"/>
             </ScrollPane>
             <Label fx:id="totalLabel" wrapText="true" style="-fx-font-weight: bold;"/>

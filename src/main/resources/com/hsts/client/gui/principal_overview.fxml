@@ -23,12 +23,12 @@
         <HBox spacing="12" style="-fx-padding: 10;">
             <VBox spacing="6" HBox.hgrow="ALWAYS">
                 <Label text="All exams (any status, any teacher) - select one to see its statistics:"/>
-                <ListView fx:id="allExamsView" prefHeight="380"/>
+                <ListView fx:id="allExamsView" prefHeight="380" VBox.vgrow="ALWAYS"/>
                 <Label fx:id="statsLabel" wrapText="true" style="-fx-font-weight: bold; -fx-padding: 6 0 0 0;"/>
             </VBox>
             <VBox spacing="6" HBox.hgrow="ALWAYS">
                 <Label text="All confirmed results (any student):"/>
-                <ListView fx:id="allResultsView" prefHeight="480"/>
+                <ListView fx:id="allResultsView" prefHeight="480" VBox.vgrow="ALWAYS"/>
             </VBox>
         </HBox>
     </center>

@@ -19,21 +19,21 @@
         </HBox>
     </top>
 
-    <left>
-        <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320">
-            <ListView fx:id="resultsListView" prefHeight="420"/>
-            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
-        </VBox>
-    </left>
-
     <center>
-        <VBox spacing="8" style="-fx-padding: 10;">
-            <Label fx:id="scoreLabel" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
-            <Label fx:id="commentLabel" wrapText="true"/>
-            <Button fx:id="viewCopyButton" onAction="#handleViewCopy" text="View graded copy" styleClass="primary-button"/>
-            <ListView fx:id="copyView" prefHeight="320"/>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+        <HBox spacing="0">
+            <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320" HBox.hgrow="ALWAYS">
+                <ListView fx:id="resultsListView" prefHeight="420" VBox.vgrow="ALWAYS"/>
+                <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
+            </VBox>
+
+            <VBox spacing="8" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label fx:id="scoreLabel" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                <Label fx:id="commentLabel" wrapText="true"/>
+                <Button fx:id="viewCopyButton" onAction="#handleViewCopy" text="View graded copy" styleClass="primary-button"/>
+                <ListView fx:id="copyView" prefHeight="320" VBox.vgrow="ALWAYS"/>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>

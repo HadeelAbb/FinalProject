@@ -25,9 +25,9 @@
 
     <center>
         <HBox spacing="16" style="-fx-padding: 20;">
-            <VBox spacing="10" prefWidth="360">
+            <VBox spacing="10" prefWidth="360" HBox.hgrow="ALWAYS">
                 <Label text="Approved exams you created:" style="-fx-text-fill: #666;"/>
-                <ListView fx:id="examListView" prefHeight="260"/>
+                <ListView fx:id="examListView" prefHeight="260" VBox.vgrow="ALWAYS"/>
 
                 <HBox spacing="8" alignment="CENTER_LEFT">
                     <Label text="Additional minutes:"/>
@@ -42,9 +42,9 @@
 
             <Separator orientation="VERTICAL"/>
 
-            <VBox spacing="10" prefWidth="360">
+            <VBox spacing="10" prefWidth="360" HBox.hgrow="ALWAYS">
                 <Label text="Executions (sittings) of the selected exam:" style="-fx-text-fill: #666;"/>
-                <ListView fx:id="executionListView" prefHeight="200"/>
+                <ListView fx:id="executionListView" prefHeight="200" VBox.vgrow="ALWAYS"/>
                 <Label fx:id="executionStatsLabel" wrapText="true" style="-fx-font-weight: bold;"/>
 
                 <Label text="Open date and time (required):"/>

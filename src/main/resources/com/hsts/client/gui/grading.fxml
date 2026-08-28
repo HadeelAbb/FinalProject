@@ -21,32 +21,32 @@
         </HBox>
     </top>
 
-    <left>
-        <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320">
-            <ListView fx:id="pendingListView" prefHeight="420"/>
-            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
-        </VBox>
-    </left>
-
     <center>
-        <VBox spacing="8" style="-fx-padding: 10;">
-            <Label fx:id="detailsLabel" wrapText="true" style="-fx-font-weight: bold;"/>
-            <Label fx:id="autoScoreLabel"/>
+        <HBox spacing="0">
+            <VBox spacing="6" style="-fx-padding: 10;" prefWidth="320" HBox.hgrow="ALWAYS">
+                <ListView fx:id="pendingListView" prefHeight="420" VBox.vgrow="ALWAYS"/>
+                <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
+            </VBox>
 
-            <Label text="Student's answers (own answer vs. correct answer):"/>
-            <ListView fx:id="answersView" prefHeight="220"/>
+            <VBox spacing="8" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label fx:id="detailsLabel" wrapText="true" style="-fx-font-weight: bold;"/>
+                <Label fx:id="autoScoreLabel"/>
 
-            <Label text="Final score (leave as-is to confirm the automatic score):"/>
-            <TextField fx:id="finalScoreField" prefWidth="120"/>
+                <Label text="Student's answers (own answer vs. correct answer):"/>
+                <ListView fx:id="answersView" prefHeight="220" VBox.vgrow="ALWAYS"/>
 
-            <Label text="Comment (required if changing the score):"/>
-            <TextArea fx:id="commentField" prefHeight="60" wrapText="true"/>
+                <Label text="Final score (leave as-is to confirm the automatic score):"/>
+                <TextField fx:id="finalScoreField" prefWidth="120"/>
 
-            <Button fx:id="confirmButton" onAction="#handleConfirm" text="Confirm grade" styleClass="primary-button"/>
+                <Label text="Comment (required if changing the score):"/>
+                <TextArea fx:id="commentField" prefHeight="60" wrapText="true"/>
 
-            <Label fx:id="statusLabel" styleClass="status-success"/>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+                <Button fx:id="confirmButton" onAction="#handleConfirm" text="Confirm grade" styleClass="primary-button"/>
+
+                <Label fx:id="statusLabel" styleClass="status-success"/>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>

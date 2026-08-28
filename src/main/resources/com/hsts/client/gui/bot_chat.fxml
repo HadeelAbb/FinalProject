@@ -30,7 +30,7 @@
     <center>
         <VBox spacing="8" style="-fx-padding: 10;">
             <Label text="Conversation history:"/>
-            <ListView fx:id="historyView" prefHeight="360"/>
+            <ListView fx:id="historyView" prefHeight="360" VBox.vgrow="ALWAYS"/>
 
             <Label text="Ask a question:"/>
             <TextArea fx:id="questionField" prefHeight="60" wrapText="true"/>

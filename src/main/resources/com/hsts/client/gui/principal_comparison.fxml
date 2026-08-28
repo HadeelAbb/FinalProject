@@ -34,10 +34,10 @@
             </HBox>
 
             <Label text="Comparison" style="-fx-font-weight: bold;"/>
-            <TableView fx:id="comparisonTable" prefHeight="220"/>
+            <TableView fx:id="comparisonTable" prefHeight="220" VBox.vgrow="ALWAYS"/>
 
             <Label text="Mean / Median Comparison" style="-fx-font-weight: bold;"/>
-            <BarChart fx:id="comparisonChart" prefHeight="220" animated="false">
+            <BarChart fx:id="comparisonChart" prefHeight="220" animated="false" VBox.vgrow="ALWAYS">
                 <xAxis>
                     <CategoryAxis label="Exam"/>
                 </xAxis>
@@ -47,7 +47,7 @@
             </BarChart>
 
             <Label fx:id="distributionLabel" text="Selected Exam Distribution" style="-fx-font-weight: bold;"/>
-            <BarChart fx:id="distributionChart" legendVisible="false" prefHeight="200" animated="false">
+            <BarChart fx:id="distributionChart" legendVisible="false" prefHeight="200" animated="false" VBox.vgrow="ALWAYS">
                 <xAxis>
                     <CategoryAxis label="Grade Range"/>
                 </xAxis>

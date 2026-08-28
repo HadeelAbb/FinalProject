@@ -23,30 +23,30 @@
         </HBox>
     </top>
 
-    <left>
-        <VBox spacing="8" style="-fx-padding: 10;" prefWidth="280">
-            <Label text="Your exams:" style="-fx-font-weight: bold;"/>
-            <ListView fx:id="examListView" prefHeight="420"/>
-            <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
-        </VBox>
-    </left>
-
     <center>
-        <VBox spacing="8" style="-fx-padding: 10;">
-            <Label fx:id="examTitleLabel" wrapText="true" style="-fx-font-weight: bold; -fx-font-size: 15px;"/>
-            <Label fx:id="emptyLabel" wrapText="true"/>
-            <TableView fx:id="resultsTable" prefHeight="240"/>
-            <Label text="Grade Distribution" style="-fx-font-weight: bold;"/>
-            <BarChart fx:id="histogramChart" legendVisible="false" prefHeight="260" animated="false">
-                <xAxis>
-                    <CategoryAxis label="Grade Range"/>
-                </xAxis>
-                <yAxis>
-                    <NumberAxis label="Number of Students" minorTickCount="0"/>
-                </yAxis>
-            </BarChart>
-            <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
-        </VBox>
+        <HBox spacing="0">
+            <VBox spacing="8" style="-fx-padding: 10;" prefWidth="280" HBox.hgrow="ALWAYS">
+                <Label text="Your exams:" style="-fx-font-weight: bold;"/>
+                <ListView fx:id="examListView" prefHeight="420" VBox.vgrow="ALWAYS"/>
+                <Button fx:id="refreshButton" onAction="#handleRefresh" text="Refresh" styleClass="action-button"/>
+            </VBox>
+
+            <VBox spacing="8" style="-fx-padding: 10;" HBox.hgrow="ALWAYS">
+                <Label fx:id="examTitleLabel" wrapText="true" style="-fx-font-weight: bold; -fx-font-size: 15px;"/>
+                <Label fx:id="emptyLabel" wrapText="true"/>
+                <TableView fx:id="resultsTable" prefHeight="240" VBox.vgrow="ALWAYS"/>
+                <Label text="Grade Distribution" style="-fx-font-weight: bold;"/>
+                <BarChart fx:id="histogramChart" legendVisible="false" prefHeight="260" animated="false" VBox.vgrow="ALWAYS">
+                    <xAxis>
+                        <CategoryAxis label="Grade Range"/>
+                    </xAxis>
+                    <yAxis>
+                        <NumberAxis label="Number of Students" minorTickCount="0"/>
+                    </yAxis>
+                </BarChart>
+                <Label fx:id="errorLabel" styleClass="status-error" wrapText="true"/>
+            </VBox>
+        </HBox>
     </center>
 
 </BorderPane>
