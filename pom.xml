@@ -36,6 +36,20 @@
     </dependencies>
 
     <build>
+        <!-- SECURITY: never copy config.properties into target/classes, so it can never
+             end up bundled into a shaded jar - this is what caused the earlier API-key
+             leak (whoever built the jar had a real config.properties locally, and the
+             shade plugin bundled it straight in). Each machine now needs its own
+             config.properties placed NEXT TO the jar at runtime instead - see
+             config.properties.template. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>config.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <!-- JavaFX plugin for standard mvn javafx:run dev executions -->
             <plugin>

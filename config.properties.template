@@ -1,0 +1,18 @@
+# HSTS config.properties template
+#
+# This file is NOT read directly by the app - it's just documentation.
+# Copy this to a REAL file named "config.properties" and place it either:
+#   1. In the project root (C:\FinalProject\config.properties) when running
+#      from the IDE, or
+#   2. In the SAME folder as Server.jar / Client.jar when running the
+#      packaged standalone JARs.
+#
+# NEVER commit the real config.properties file - it's gitignored on purpose.
+# The app will refuse to start the bot/DB correctly without it, but will not
+# crash - it just falls back to defaults and prints a warning.
+
+db.user=root
+db.password=your_mysql_password_here
+
+# Get a free key at https://console.groq.com/keys (no credit card needed)
+groq.api.key=your_groq_api_key_here

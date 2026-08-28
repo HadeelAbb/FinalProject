@@ -30,17 +30,10 @@ public class BotApiClient {
     }
 
     private String loadApiKey() {
-        Properties props = new Properties();
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream("config.properties")) {
-            if (in != null) {
-                props.load(in);
-                String key = props.getProperty("groq.api.key");
-                if (key != null && !key.isBlank()) {
-                    return key.trim();
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("[BOT] Could not read config.properties: " + e.getMessage());
+        Properties props = server.ConfigLoader.load();
+        String key = props.getProperty("groq.api.key");
+        if (key != null && !key.isBlank()) {
+            return key.trim();
         }
         System.err.println("[BOT] No groq.api.key found in config.properties - bot will use fallback answers.");
         return null;

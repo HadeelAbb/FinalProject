@@ -16,7 +16,7 @@ executables/
 *.iml
 
 # DB credentials - never commit this
-src/main/resources/config.properties
+config.properties
 # Configuration, environment files & secrets
 config.properties
 **/config.properties

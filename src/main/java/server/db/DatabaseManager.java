@@ -30,21 +30,13 @@ public class DatabaseManager {
     }
 
     private void loadCredentials() {
-        Properties prop = new Properties();
-        // Look inside the project resources container for our file
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.properties")) {
-            if (input == null) {
-                System.err.println("[SERVER-DB] WARNING: config.properties not found! Falling back to defaults.");
-                this.dbUser = "root";
-                this.dbPassword = ""; // default fallback
-                return;
-            }
-            // Load the text properties parameters into memory
-            prop.load(input);
-            this.dbUser = prop.getProperty("db.user");
-            this.dbPassword = prop.getProperty("db.password");
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        Properties prop = server.ConfigLoader.load();
+        this.dbUser = prop.getProperty("db.user");
+        this.dbPassword = prop.getProperty("db.password");
+        if (this.dbUser == null || this.dbPassword == null) {
+            System.err.println("[SERVER-DB] WARNING: db.user/db.password not found in config.properties! Falling back to defaults.");
+            if (this.dbUser == null) this.dbUser = "root";
+            if (this.dbPassword == null) this.dbPassword = "";
         }
     }
 
